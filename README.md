@@ -4,4 +4,6 @@
 
 ## Usage
 
+* Go To https://jayshihchou.github.io/simple3dviewer/
+
 * Draw .obj or .fbx file into browser.
