@@ -1,0 +1,8 @@
+* text=auto
+*.txt text
+*.ini text
+*.html text
+*.json text
+*.js text eol=lf
+*.css text
+*.jpg binary
