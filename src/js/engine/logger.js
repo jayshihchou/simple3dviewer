@@ -25,6 +25,7 @@ class Logger {
 
     const self = this;
 
+    console.oldLog = console.log;
     this.oldLog = console.log;
     console.log = (...args) => {
       if (self.showFullStack) {
@@ -40,6 +41,7 @@ class Logger {
       self.oldLog.apply(console, args);
     };
 
+    console.oldWarn = console.warn;
     this.oldWarn = console.warn;
     console.warn = (...args) => {
       if (self.showFullStack) {
@@ -55,6 +57,7 @@ class Logger {
       self.oldWarn.apply(console, args);
     };
 
+    console.oldError = console.error;
     this.oldError = console.error;
     console.error = (...args) => {
       if (self.showFullStack) {
