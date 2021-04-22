@@ -13,7 +13,7 @@ export default class GameNode {
     this.components = [];
     this.id = GameNode.getEmptyID();
     this.ui = this.renderable instanceof Widget;
-    this.name = `node : ${this.id}`;
+    this.name = `node (${this.id}): `;
     if (name !== undefined) this.name += name;
 
     gameNodeGroup[this.id] = this;
