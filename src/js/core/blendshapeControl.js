@@ -17,7 +17,7 @@ export default class BlendShapeControl {
   }
 
   init(mesh) {
-    if (!mesh || mesh.blendShapeSize < 0) return;
+    if (!mesh || mesh.blendShapeSize <= 0) return;
     if (this.mesh) {
       this.mesh = mesh;
     } else {
