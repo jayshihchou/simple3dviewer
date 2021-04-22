@@ -306,7 +306,7 @@ const fbxloader = {};
             // Assume one model and get the preRotation from that
             // if there is more than one model associated with the geometry this may cause problems
             var modelNode = modelNodes[0];
-            // console.log(modelNode);
+            // console.oldLog(modelNode);
 
             // var transformData = {};
 
@@ -323,6 +323,29 @@ const fbxloader = {};
             if ('Lcl_Scaling' in modelNode) transform.scale = modelNode.Lcl_Scaling.value;
             if ('Lcl_Translation' in modelNode) transform.position = modelNode.Lcl_Translation.value;
 
+            if ('RotationPivot' in modelNode) {
+                if (!('position' in transform)) {
+                    transform.position = [0.0, 0.0, 0.0];
+                }
+                transform.position[0] += modelNode.RotationPivot.value[0];
+                transform.position[1] += modelNode.RotationPivot.value[1];
+                transform.position[2] += modelNode.RotationPivot.value[2];
+                if (!('pivot' in transform)) {
+                    transform.pivot = [0.0, 0.0, 0.0];
+                }
+                transform.pivot[0] += modelNode.RotationPivot.value[0];
+                transform.pivot[1] += modelNode.RotationPivot.value[1];
+                transform.pivot[2] += modelNode.RotationPivot.value[2];
+            }
+            if ('ScalingOffset' in modelNode) {
+                if (!('pivot' in transform)) {
+                    transform.pivot = [0.0, 0.0, 0.0];
+                }
+                transform.pivot[0] -= modelNode.ScalingOffset.value[0];
+                transform.pivot[1] -= modelNode.ScalingOffset.value[1];
+                transform.pivot[2] -= modelNode.ScalingOffset.value[2];
+            }
+
             return this.genGeometry(geoNode, morphTargets, transform);
 
         },
@@ -334,6 +357,16 @@ const fbxloader = {};
             // if (geoNode.attrName) geo.name = geoNode.attrName;
 
             var geoInfo = this.parseGeoNode(geoNode);
+
+            if ('pivot' in preTransform) {
+                let rp = preTransform.pivot;
+                for (let i = 0, imax = geoInfo.vertexPositions.length; i < imax; ++i) {
+                    geoInfo.vertexPositions[i] -= rp[i % 3];
+                }
+            }
+
+            // console.oldLog(geoInfo);
+
             var buffers = this.genBuffers(geoInfo);
             buffers.meshVertices = geoInfo.vertexPositions;
             buffers.meshFaces = geoInfo.VertexIndices;
