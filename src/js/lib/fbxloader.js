@@ -369,7 +369,7 @@ const fbxloader = {};
 
             var buffers = this.genBuffers(geoInfo);
             buffers.meshVertices = geoInfo.vertexPositions;
-            buffers.meshFaces = geoInfo.VertexIndices;
+            buffers.meshFaces = geoInfo.vertexIndices;
             // console.log(preTransform);
             return {
                 buffers: buffers,

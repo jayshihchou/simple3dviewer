@@ -20,7 +20,7 @@ export default class TestFramebuffer {
     const quadsize = 0.1;
     this.quad.rect.setRelative(-quadsize, -quadsize, quadsize, quadsize);
     // this.quad.color = [1.0, 1.0, 1.0, 0.3];
-    // app.node.renderable.material.setUniformData('texture', this.light.renderTexture.texture);
+    // app.node.renderable.material.setUniformData('uAlbedo', this.light.renderTexture.texture);
   }
 
   update() {

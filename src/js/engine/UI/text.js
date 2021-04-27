@@ -1,5 +1,5 @@
 import { Widget } from './widget.js';
-import { inverseDevicePixelRatio, realScreenSize } from '../inputmanager.js';
+import { inverseDevicePixelRatio, realScreenSize } from '../utils.js';
 
 const container = document.getElementById('container');
 const textSizeCalculator = document.createRange();

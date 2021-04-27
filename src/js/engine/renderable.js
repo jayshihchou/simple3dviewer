@@ -1,5 +1,5 @@
 ﻿/* eslint-disable max-len */
-import { setFrameDirty } from './inputmanager.js';
+import { setFrameDirty } from './utils.js';
 import { gl } from './gl.js';
 import { Shader } from './shader.js';
 import { mat4, mat3 } from '../lib/gl-matrix/index.js';
@@ -103,7 +103,7 @@ export default class Renderable {
     if (shader) {
       shader.bind();
 
-      if (mat.hasKey('cameraPosition')) mat.setUniformData('cameraPosition', camera.transform.position);
+      if (mat.hasKey('uCameraPosition')) mat.setUniformData('uCameraPosition', camera.transform.position);
       if (mat.hasKey('cameraResolution')) mat.setUniformData('cameraResolution', camera.resolution);
       if (mat.hasKey('viewMatrix')) mat.setUniformData('viewMatrix', viewMat);
       if (mat.hasKey('projectionMatrix')) mat.setUniformData('projectionMatrix', projMat);

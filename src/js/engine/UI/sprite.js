@@ -18,7 +18,7 @@ export default class Sprite extends Widget {
     }
     if (texPath) this.texture.loadFromUrl(texPath);
 
-    this.material.setUniformData('texture', this.texture);
+    this.material.setUniformData('uAlbedo', this.texture);
 
     this.attributeDatas = [
       {

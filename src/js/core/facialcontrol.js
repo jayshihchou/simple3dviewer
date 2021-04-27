@@ -5,7 +5,7 @@ import { Button } from '../engine/UI/button.js';
 import { Slider } from '../engine/UI/slider.js';
 import { Text } from '../engine/UI/text.js';
 import { Joystick } from '../engine/UI/joystick.js';
-import { clamp } from '../engine/inputmanager.js';
+import { clamp } from '../engine/utils.js';
 import { SetControlEnabled } from './blendshapeControl.js';
 import { addOnStart } from './app.js';
 

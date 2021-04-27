@@ -1,5 +1,17 @@
+/* eslint-disable max-len */
 /* eslint-disable prefer-destructuring */
-import { clamp } from './inputmanager.js';
+import { clamp } from './utils.js';
+import { vec3 } from '../lib/gl-matrix/index.js';
+
+function calcNormal(v0, v1, v2) {
+  const u = vec3.subtract(vec3.create(), v1, v0);
+  const v = vec3.subtract(vec3.create(), v2, v0);
+
+  return vec3.normalize(vec3.create(), vec3.set(vec3.create(),
+    (u[1] * v[2]) - (u[2] * v[1]),
+    (u[2] * v[0]) - (u[0] * v[2]),
+    (u[0] * v[1]) - (u[1] * v[0])));
+}
 
 export default function ObjLoader(fileData) {
   if (fileData === undefined) return undefined;
@@ -22,11 +34,11 @@ export default function ObjLoader(fileData) {
   let vals;
   const vertices = [];
   const vertexColors = [];
-  const normals = [];
-  const texcoords = [];
+  let normals = [];
+  const uvs = [];
   const vIndices = [];
-  const tIndices = [];
-  const nIndices = [];
+  let tIndices = [];
+  let nIndices = [];
   let vertOnFaceCount = -1;
   let slashCount = 1;
   let addTexcoord = false;
@@ -38,8 +50,8 @@ export default function ObjLoader(fileData) {
   function setIndices(val, sCount) {
     splitted = val.split(/\//);
     vIndices.push(splitted[0] - 1);
-    if (addTexcoord) tIndices.push(splitted[1] - 1);
-    if (addNormal) {
+    if (sCount > 1 && addTexcoord) tIndices.push(splitted[1] - 1);
+    if (sCount > 1 && addNormal) {
       if (sCount === 3) {
         nIndices.push(splitted[2] - 1);
       } else {
@@ -64,8 +76,8 @@ export default function ObjLoader(fileData) {
         vals = line.split(' ');
         vals[1] = parseFloat(vals[1]);
         vals[2] = parseFloat(vals[2]);
-        texcoords.push(vals[1]);
-        texcoords.push(vals[2]);
+        uvs.push(vals[1]);
+        uvs.push(vals[2]);
         addTexcoord = true;
       } else {
         vals = line.split(' ');
@@ -118,15 +130,95 @@ export default function ObjLoader(fileData) {
     meshDict[lastMeshName].imax = vIndices.length;
   }
 
+  if (addTexcoord && tIndices.length === 0) {
+    tIndices = vIndices;
+  }
+
+  if (addNormal && nIndices.length === 0) {
+    nIndices = vIndices;
+  }
+
+  if (normals.length === 0) {
+    normals = Array(vertices.length).fill(0.0);
+    nIndices = vIndices;
+    const sameIndices = Array(vertices.length).fill(0.0);
+    let i0;
+    let i1;
+    let i2;
+    let v0;
+    let v1;
+    let v2;
+    let nor;
+    const imax = vIndices.length;
+    for (i = 0; i < imax; i += 3) {
+      i0 = vIndices[i];
+      i1 = vIndices[i + 1];
+      i2 = vIndices[i + 2];
+      v0 = vec3.set(vec3.create(), vertices[i0 * 3], vertices[(i0 * 3) + 1], vertices[(i0 * 3) + 2]);
+      v1 = vec3.set(vec3.create(), vertices[i1 * 3], vertices[(i1 * 3) + 1], vertices[(i1 * 3) + 2]);
+      v2 = vec3.set(vec3.create(), vertices[i2 * 3], vertices[(i2 * 3) + 1], vertices[(i2 * 3) + 2]);
+
+      nor = calcNormal(v0, v1, v2);
+      sameIndices[(i0 * 3) + 0] += 1.0;
+      sameIndices[(i0 * 3) + 1] += 1.0;
+      sameIndices[(i0 * 3) + 2] += 1.0;
+      sameIndices[(i1 * 3) + 0] += 1.0;
+      sameIndices[(i1 * 3) + 1] += 1.0;
+      sameIndices[(i1 * 3) + 2] += 1.0;
+      sameIndices[(i2 * 3) + 0] += 1.0;
+      sameIndices[(i2 * 3) + 1] += 1.0;
+      sameIndices[(i2 * 3) + 2] += 1.0;
+
+      normals[(i0 * 3) + 0] += nor[0];
+      normals[(i0 * 3) + 1] += nor[1];
+      normals[(i0 * 3) + 2] += nor[2];
+      normals[(i1 * 3) + 0] += nor[0];
+      normals[(i1 * 3) + 1] += nor[1];
+      normals[(i1 * 3) + 2] += nor[2];
+      normals[(i2 * 3) + 0] += nor[0];
+      normals[(i2 * 3) + 1] += nor[1];
+      normals[(i2 * 3) + 2] += nor[2];
+    }
+    for (i = normals.length - 1; i >= 0; i -= 1) {
+      normals[i] /= sameIndices[i];
+    }
+  }
+
+  // console.log(`vind len: ${vIndices.length}, tind len: ${tIndices.length}, nind len: ${nIndices.length}`);
+
+  const faceVertices = Array(vIndices.length * 3).fill(0.0);
+  const faceUVs = Array(vIndices.length * 2).fill(0.0);
+  const faceNormals = Array(vIndices.length * 3).fill(0.0);
+  const imax = vIndices.length;
+  let vID;
+  for (i = 0; i < imax; i += 1) {
+    vID = vIndices[i];
+    faceVertices[i * 3] = vertices[vID * 3];
+    faceVertices[i * 3 + 1] = vertices[(vID * 3) + 1];
+    faceVertices[i * 3 + 2] = vertices[(vID * 3) + 2];
+    vID = tIndices[i];
+    faceUVs[i * 2] = uvs[vID * 2];
+    faceUVs[i * 2 + 1] = uvs[(vID * 2) + 1];
+    vID = nIndices[i];
+    faceNormals[i * 3] = normals[vID * 3];
+    faceNormals[i * 3 + 1] = normals[(vID * 3) + 1];
+    faceNormals[i * 3 + 2] = normals[(vID * 3) + 2];
+  }
+
   const aabb = [];
   aabb[0] = [minX, minY, minZ];
   aabb[1] = [maxX, maxY, maxZ];
   // console.log(meshDict);
   // console.log(Object.keys(meshDict).length);
+  // console.oldLog(normals);
+  // console.oldLog(vertices);
   return {
     vertices,
+    uvs,
     normals,
-    uv: texcoords,
+    faceVertices,
+    faceUVs,
+    faceNormals,
     vertexColors,
     faces: vIndices,
     uv_faces: tIndices,

@@ -1,35 +1,6 @@
+import { setFrameDirty, screenSize, clamp } from './utils.js';
 // eslint-disable-next-line import/no-mutable-exports
 let input;
-let frameDirty = true;
-const screenSize = [0, 0];
-const realScreenSize = [0, 0];
-const resizeListeners = [];
-const { devicePixelRatio } = window;
-const inverseDevicePixelRatio = 1.0 / devicePixelRatio;
-
-function setFrameDirty() {
-  frameDirty = true;
-}
-
-function getFrameDirty() {
-  const isDirty = frameDirty;
-  if (isDirty) {
-    frameDirty = false;
-  }
-  return isDirty;
-}
-
-function updateScreenSize(x, y) {
-  screenSize[0] = x;
-  screenSize[1] = y;
-}
-
-function clamp(v, min, max) {
-  let val = v;
-  if (val > max) val = max;
-  if (val < min) val = min;
-  return val;
-}
 
 function onMouseWheel(event) {
   setFrameDirty();
@@ -302,17 +273,5 @@ class InputManager {
 
 input = new InputManager();
 
-// export default { input };
-
-export {
-  input,
-  clamp,
-  updateScreenSize,
-  setFrameDirty,
-  getFrameDirty,
-  screenSize,
-  realScreenSize,
-  resizeListeners,
-  devicePixelRatio,
-  inverseDevicePixelRatio,
-};
+// eslint-disable-next-line import/prefer-default-export
+export { input };

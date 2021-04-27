@@ -1,4 +1,5 @@
-import { input, setFrameDirty, clamp } from '../engine/inputmanager.js';
+import { input } from '../engine/inputmanager.js';
+import { setFrameDirty, clamp } from '../engine/utils.js';
 import { vec3 } from '../lib/gl-matrix/index.js';
 import { isMobile } from '../engine/logger.js';
 import { Rect } from '../engine/UI/rect.js';

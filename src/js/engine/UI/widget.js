@@ -1,6 +1,7 @@
 import { Renderable } from '../renderable.js';
 import { Rect } from './rect.js';
-import { input, screenSize } from '../inputmanager.js';
+import { input } from '../inputmanager.js';
+import { screenSize } from '../utils.js';
 
 export default class Widget extends Renderable {
   constructor(material) {

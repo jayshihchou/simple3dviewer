@@ -2,7 +2,8 @@ import { Rect } from './rect.js';
 import { GameNode } from '../gamenode.js';
 import { Text } from './text.js';
 import { Sprite } from './sprite.js';
-import { input, setFrameDirty } from '../inputmanager.js';
+import { input } from '../inputmanager.js';
+import { setFrameDirty } from '../utils.js';
 
 export default class Button {
   constructor(rect) {

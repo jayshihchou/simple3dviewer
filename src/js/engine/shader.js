@@ -18,16 +18,14 @@ function removeShaderText(text) {
     .replaceAll('\r', '');
 }
 
-const shadersMap = [
-  // error
-  {
-    name: 'error',
-    vs: `DEFINES
+const shadersMap = {
+  error: {
+    vs: `#pragma DEFINES
 attribute vec3 position;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
-UNIFORMS
+#pragma UNIFORMS
 void main(void)
 {
   gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
@@ -36,9 +34,9 @@ void main(void)
 {
   gl_FragColor = vec4(0.5, 0.0, 0.7, 1.0);
 }`,
-  }, { // debug
-    name: 'debug',
-    vs: `DEFINES
+  },
+  debug: {
+    vs: `#pragma DEFINES
 attribute vec3 position;
 
 uniform mat4 viewMatrix;
@@ -46,7 +44,7 @@ uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
 
 uniform vec4 color;
-UNIFORMS
+#pragma UNIFORMS
 varying lowp vec4 vColor;
 
 void main(void)
@@ -60,19 +58,21 @@ void main(void)
 {
   gl_FragColor = vColor;
 }`,
-  }, { // default
-    name: 'default',
-    vs: `DEFINES
+  },
+  default: {
+    vs: `#pragma DEFINES
 attribute vec3 position;
 attribute vec3 color;
 attribute vec3 normal;
 attribute vec2 texcoord;
+attribute vec3 tangent;
+attribute vec3 bitangent;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
 uniform mat3 normalMatrix;
 
-UNIFORMS
+#pragma UNIFORMS
 
 varying highp vec2 vTexcoord;
 varying highp vec3 vColor;
@@ -88,14 +88,14 @@ void main(void)
   v = (viewMatrix * modelMatrix * vec4(finalPos, 1.0)).xyz;
   N = normalize(normalMatrix * normal);
 }`,
-    fs: `uniform sampler2D texture;
+    fs: `uniform sampler2D uAlbedo;
 varying highp vec2 vTexcoord;
 varying highp vec3 vColor;
 varying highp vec3 N;
 varying highp vec3 v;
 void main(void)
 {
-  highp vec4 col = texture2D(texture, vTexcoord);
+  highp vec4 col = texture2D(uAlbedo, vTexcoord);
   // col.xyz += vColor;
 
   highp vec3 L = normalize(vec3(0.0, 0.0, -1.0) - v);
@@ -111,19 +111,21 @@ void main(void)
   Ispec = clamp(Ispec, 0.0, 1.0);
   gl_FragColor = col * (Iamb + Idiff + Ispec);
 }`,
-  }, { // default_orig
-    name: 'default_orig',
-    vs: `DEFINES
+  },
+  default_orig: {
+    vs: `#pragma DEFINES
 attribute vec3 position;
 attribute vec3 color;
 attribute vec3 normal;
 attribute vec2 texcoord;
+attribute vec3 tangent;
+attribute vec3 bitangent;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
 uniform mat3 normalMatrix;
 
-UNIFORMS
+#pragma UNIFORMS
 
 varying highp vec2 vTexcoord;
 
@@ -142,24 +144,24 @@ void main(void)
   highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
   vLighting = ambientLight + (directionalLightColor * directional);
 }`,
-    fs: `uniform sampler2D texture;
+    fs: `uniform sampler2D uAlbedo;
 varying highp vec2 vTexcoord;
 varying highp vec3 vLighting;
 void main(void)
 {
-  highp vec4 col = texture2D(texture, vTexcoord);
+  highp vec4 col = texture2D(uAlbedo, vTexcoord);
   gl_FragColor = vec4(col.rgb * vLighting, col.a);
 }`,
-  }, { // sprite
-    name: 'sprite',
-    vs: `DEFINES
+  },
+  sprite: {
+    vs: `#pragma DEFINES
 attribute vec2 position;
 attribute vec2 texcoord;
 uniform mat4 modelMatrix;
 uniform vec2 halfView;
 uniform vec4 widgetRect;
 uniform vec4 color;
-UNIFORMS
+#pragma UNIFORMS
 varying highp vec2 vTexcoord;
 varying lowp vec4 vColor;
 void main(void)
@@ -171,17 +173,17 @@ void main(void)
   vTexcoord = texcoord;
   vColor = color;
 }`,
-    fs: `uniform sampler2D texture;
+    fs: `uniform sampler2D uAlbedo;
 varying highp vec2 vTexcoord;
 varying lowp vec4 vColor;
 void main(void)
 {
-  gl_FragColor = texture2D(texture, vTexcoord) * vColor;
+  gl_FragColor = texture2D(uAlbedo, vTexcoord) * vColor;
 }`,
-  }, { // sprite_circle
-    name: 'sprite_circle',
+  },
+  sprite_circle: {
     vs: `precision highp float;
-DEFINES
+#pragma DEFINES
 attribute vec2 position;
 attribute vec2 texcoord;
 uniform mat4 modelMatrix;
@@ -189,7 +191,7 @@ uniform vec2 halfView;
 uniform vec4 widgetRect;
 uniform float radius;
 uniform vec4 color;
-UNIFORMS
+#pragma UNIFORMS
 varying highp vec2 vTexcoord;
 varying lowp vec4 vColor;
 varying highp vec2 radius_data;
@@ -203,7 +205,7 @@ void main(void)
   vColor = color;
 }`,
     fs: `precision highp float;
-uniform sampler2D texture;
+uniform sampler2D uAlbedo;
 varying highp vec2 vTexcoord;
 varying lowp vec4 vColor;
 varying highp vec2 radius_data;
@@ -212,111 +214,19 @@ void main(void)
   vec2 dir = vTexcoord * 2.0 - 1.0;
 
   if ((dir.x * dir.x + dir.y * dir.y) > 1.0) discard;
-  gl_FragColor = texture2D(texture, vTexcoord) * vColor;
+  gl_FragColor = texture2D(uAlbedo, vTexcoord) * vColor;
 
 }`,
-  }, { // blendshape
-    name: 'blendshape',
-    vs: `DEFINES
-precision highp float;
-attribute vec3 position;
-attribute vec3 normal;
-attribute vec2 texcoord;
-
-uniform mat4 viewMatrix;
-uniform mat4 modelMatrix;
-uniform mat4 projectionMatrix;
-uniform mat3 normalMatrix;
-
-UNIFORMS
-
-varying highp vec2 vTexcoord;
-varying highp vec3 N;
-varying highp vec3 v;
-
-void main()
-{
-  vec3 finalPos = position;
-  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
-  vTexcoord = texcoord;
-  v = (viewMatrix * modelMatrix * vec4(finalPos, 1.0)).xyz;
-  N = normalize(normalMatrix * normal);
-}`,
-    fs: `precision highp float;
-uniform sampler2D texture;
-uniform float gloss;
-varying highp vec2 vTexcoord;
-varying highp vec3 N;
-varying highp vec3 v;
-void main(void)
-{
-  highp vec4 col = texture2D(texture, vTexcoord);
-
-  highp vec3 L = normalize(vec3(0.0, 0.0, -1.0) - v);
-  highp vec3 E = normalize(-v); // we are in Eye Coordinates, so EyePos is (0,0,0)
-  highp vec3 R = normalize(-reflect(L, N));
-
-  highp vec4 Iamb = vec4(0.3, 0.3, 0.3, 1.0);
-
-  highp vec4 Idiff = vec4(0.8, 0.8, 0.78, 1.0) * max(dot(N,L), 0.0);
-  Idiff = clamp(Idiff, 0.0, 1.0);
-
-  highp vec4 Ispec = vec4(0.8, 0.8, 0.78, 1.0) * pow(max(dot(R, E), 0.0), gloss);
-  Ispec = clamp(Ispec, 0.0, 1.0);
-  gl_FragColor = col * (Iamb + Idiff + Ispec);
-}`,
-  }, { // blendshape_orig
-    name: 'blendshape_orig',
-    vs: `DEFINES
-precision highp float;
-attribute vec3 position;
-attribute vec3 normal;
-attribute vec2 texcoord;
-
-uniform mat4 viewMatrix;
-uniform mat4 modelMatrix;
-uniform mat4 projectionMatrix;
-uniform mat3 normalMatrix;
-
-UNIFORMS
-
-varying highp vec2 vTexcoord;
-varying highp vec3 vLighting;
-
-void main()
-{
-  vec3 finalPos = position;
-  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
-  vTexcoord = texcoord;
-  highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
-  highp vec3 directionalLightColor = vec3(0.8, 0.8, 0.78);
-  highp vec3 directionalVector = normalize(vec3(0.0, 0.0, 1.0));
-
-  highp vec3 transformedNormal = normalMatrix * normal;
-
-  highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-  vLighting = ambientLight + (directionalLightColor * directional);
-}`,
-    fs: `precision highp float;
-uniform sampler2D texture;
-uniform float gloss;
-varying highp vec2 vTexcoord;
-varying highp vec3 vLighting;
-void main(void)
-{
-  highp vec4 col = texture2D(texture, vTexcoord);
-  gl_FragColor = vec4(col.rgb * vLighting, col.a);
-}`,
-  }, { // pointcloud
-    name: 'pointcloud',
-    vs: `DEFINES
+  },
+  pointcloud: {
+    vs: `#pragma DEFINES
 attribute vec3 position;
 attribute vec3 color;
 
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
-UNIFORMS
+#pragma UNIFORMS
 varying highp vec3 vColor;
 
 void main(void)
@@ -332,9 +242,9 @@ void main(void)
 {
   gl_FragColor = vec4(vColor, 1.0);
 }`,
-  }, { // hair
-    name: 'hair',
-    vs: `DEFINES
+  },
+  hair: {
+    vs: `#pragma DEFINES
 attribute vec3 position;
 attribute vec3 tangent;
 
@@ -343,7 +253,7 @@ uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
 uniform mat3 normalMatrix;
 
-UNIFORMS
+#pragma UNIFORMS
 
 varying highp vec4 worldPosition;
 varying highp vec3 worldTangent;
@@ -357,18 +267,18 @@ void main(void)
 }`,
     fs: `
 precision highp float;
-DEFINES
+#pragma DEFINES
 
 #define M_PI 3.14159265358979323846
 #define M_E  2.71828182845904523536
 
 varying highp vec4 worldPosition;
 varying highp vec3 worldTangent;
-UNIFORMS
+#pragma UNIFORMS
 
 uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
-uniform vec3 cameraPosition;
+uniform vec3 uCameraPosition;
 uniform vec2 cameraResolution;
 
 uniform vec4 color;
@@ -480,7 +390,7 @@ void main(void)
 #ifdef LIGHT_COUNT
   shading = vec3(0.0, 0.0, 0.0);
   // === kajiya kay ===
-  highp vec3 eye = normalize(worldPosition.xyz - cameraPosition);
+  highp vec3 eye = normalize(worldPosition.xyz - uCameraPosition);
   for (int i = 0; i < LIGHT_COUNT; i++) {
     //                vec3 diffuse, vec3 specular, float p, vec3 tangent, vec3 light, vec3 eye
     shading += kajiya_kay(color.xyz, lightColors[i], 80.0, worldTangent, lightDirections[i], eye);
@@ -488,15 +398,15 @@ void main(void)
 #endif
   gl_FragColor = vec4(shading * occlusion, converage);
 }`,
-  }, { // shadow
-    name: 'shadow',
+  },
+  shadow: {
     vs: `precision highp float;
-DEFINES
+#pragma DEFINES
 attribute vec3 position;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
-UNIFORMS
+#pragma UNIFORMS
 varying highp vec2 zw;
 void main(void)
 {
@@ -518,7 +428,7 @@ void main(void)
   gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
 }`,
   },
-];
+};
 
 for (let i = shadersMap.length - 1; i >= 0; i -= 1) {
   shadersMap[i].vs = removeShaderText(shadersMap[i].vs);
@@ -526,7 +436,7 @@ for (let i = shadersMap.length - 1; i >= 0; i -= 1) {
 }
 
 function loadShader(type, name, s) {
-  const source = s.replace('DEFINES', '').replace('UNIFORMS', '');
+  const source = s.replace('#pragma DEFINES', '').replace('#pragma UNIFORMS', '');
   const shader = gl.createShader(type);
 
   // Send the source to the shader object
@@ -702,6 +612,7 @@ export default class Shader {
   setVec3(name, vec) {
     const uniLoc = this.getUniformLocation(name);
     if (uniLoc) gl.uniform3fv(uniLoc, vec);
+    else console.log(`Cannot find uniLoc for name: ${name}`);
     return this;
   }
 
@@ -731,8 +642,8 @@ export default class Shader {
 
   static FindShaderSource(name) {
     if (typeof name === 'string') {
-      for (let i = shadersMap.length - 1; i >= 0; i -= 1) {
-        if (name === shadersMap[i].name) return shadersMap[i];
+      if (name in shadersMap) {
+        return shadersMap[name];
       }
       // eslint-disable-next-line no-console
       console.error(`Cannot find shader ${name}`);

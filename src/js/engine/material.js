@@ -27,9 +27,11 @@ export default class Material {
       this.defineVals.length = 0;
       this.shaderName = shaderName;
     }
+
     let shaderSrc = Shader.FindShaderSource(this.shaderName);
     if (!shaderSrc) shaderSrc = Shader.FindShaderSource('debug');
     if (shaderName) {
+      // console.log(shaderName);
       this.parseFromShader(shaderSrc);
     } else {
       this.updateParameters();
@@ -44,10 +46,11 @@ export default class Material {
       }
       shaderSrc = {
         name: shaderSrc.name,
-        vs: shaderSrc.vs.replace('DEFINES', defines),
-        fs: shaderSrc.fs.replace('DEFINES', defines),
+        vs: shaderSrc.vs.replace('#pragma DEFINES', defines).replace('#pragma UNIFORMS', ''),
+        fs: shaderSrc.fs.replace('#pragma DEFINES', defines).replace('#pragma UNIFORMS', ''),
       };
     }
+    // console.log(shaderSrc.fs);
     this.shader = new Shader(shaderSrc);
   }
 
@@ -74,7 +77,9 @@ export default class Material {
 
   parseFromShader(shaderSrc) {
     // console.log(shaderSrc.name);
+    // console.log('vs');
     this.parseFromStr(shaderSrc.vs);
+    // console.log('fs');
     this.parseFromStr(shaderSrc.fs);
     return this;
   }
@@ -264,6 +269,7 @@ export default class Material {
             this.shader.setVec4(param.name, param.data);
             break;
           case 'vec3':
+            // console.log(`name: ${param.name} data: ${param.data}`);
             this.shader.setVec3(param.name, param.data);
             break;
           case 'vec2':
@@ -302,7 +308,7 @@ export default class Material {
   }
 
   parseFromStr(text) {
-    const str = text.replace('DEFINES', '').replace('UNIFORMS', '');
+    const str = text.replace('#pragma DEFINES', '').replace('#pragma UNIFORMS', '');
 
     let i = 0;
     let end;
@@ -317,6 +323,8 @@ export default class Material {
       }
     }
     while (i >= 0);
+
+    // console.log(str);
 
     const lines = str.split('\n');
     let type;
@@ -404,6 +412,7 @@ export default class Material {
         }
       }
     }
+    // console.oldLog(this.parameters);
   }
 }
 

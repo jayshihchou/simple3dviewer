@@ -2,7 +2,8 @@
 import { Rect } from './rect.js';
 import { GameNode } from '../gamenode.js';
 import { Sprite } from './sprite.js';
-import { input, clamp } from '../inputmanager.js';
+import { input } from '../inputmanager.js';
+import { clamp } from '../utils.js';
 
 export default class Slider {
   constructor(rect) {

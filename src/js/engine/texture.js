@@ -2,7 +2,7 @@
 /* eslint-disable max-classes-per-file */
 import { gl } from './gl.js';
 import { ReadFile } from './readFile.js';
-import { setFrameDirty } from './inputmanager.js';
+import { setFrameDirty } from './utils.js';
 import { Framebuffer } from './framebuffer.js';
 
 let maxTexUnitCount;
@@ -152,6 +152,7 @@ class Texture2D extends Texture {
     let pixel = pixels;
     if (pixels === undefined && type === gl.UNSIGNED_BYTE) {
       pixel = new Uint8Array([160, 60, 60, 255]);
+      setFrameDirty();
     }
     // level is mipmap level highest is 0
     this.level = 0;
@@ -274,6 +275,7 @@ class Texture2D extends Texture {
     gl.bindTexture(gl.TEXTURE_2D, null);
     gl.activeTexture(gl.TEXTURE0);
     this.image = image;
+    setFrameDirty();
     if (this.onloaded !== undefined) {
       this.onloaded();
     }

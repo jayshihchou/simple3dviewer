@@ -1,4 +1,4 @@
-import { setFrameDirty } from '../engine/inputmanager.js';
+import { setFrameDirty } from '../engine/utils.js';
 import { Button } from '../engine/UI/button.js';
 import { Rect } from '../engine/UI/rect.js';
 import { addOnStart } from './app.js';

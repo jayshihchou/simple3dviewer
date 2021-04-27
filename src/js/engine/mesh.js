@@ -1,7 +1,9 @@
-﻿/* eslint-disable no-bitwise */
+﻿/* eslint-disable prefer-destructuring */
+/* eslint-disable max-len */
+/* eslint-disable no-bitwise */
 import { Renderable, DrawingMode } from './renderable.js';
 import { Material } from './material.js';
-import { vec3 } from '../lib/gl-matrix/index.js';
+import { vec3, vec2 } from '../lib/gl-matrix/index.js';
 import { ObjLoader } from './objLoader.js';
 import { HairLoader } from './hairloader.js';
 import { gl } from './gl.js';
@@ -44,16 +46,6 @@ function findBestTextureSize(vertexSize) {
     texSize *= 2;
   }
   return texSize;
-}
-
-function calcNormal(v0, v1, v2) {
-  const u = vec3.subtract(vec3.create(), v1, v0);
-  const v = vec3.subtract(vec3.create(), v2, v0);
-
-  return vec3.normalize(vec3.create(), vec3.set(vec3.create(),
-    (u[1] * v[2]) - (u[2] * v[1]),
-    (u[2] * v[0]) - (u[0] * v[2]),
-    (u[0] * v[1]) - (u[1] * v[0])));
 }
 
 function createBlendShapeTexture(rawTargets, fbxTree, vertexSize, texSize) {
@@ -159,6 +151,173 @@ function createBlendShapeTexture(rawTargets, fbxTree, vertexSize, texSize) {
   // return new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, false, texSize, texSize, texBytes, texOptions);
 }
 
+function orthogonalize(nor, tan) {
+  let res = vec3.copy(vec3.create(), tan);
+  const s = vec3.scale(vec3.create(), nor, vec3.dot(nor, res) / vec3.dot(nor, nor));
+
+  res = vec3.sub(res, res, s);
+  return vec3.normalize(res, res);
+}
+
+function fromTriangleNormalized(tris, tar, OrigSize) {
+  const res = Array(OrigSize).fill(0.0);
+  tris.forEach((tri, i) => {
+    res[tri * 3 + 0] += tar[i * 3 + 0];
+    res[tri * 3 + 1] += tar[i * 3 + 1];
+    res[tri * 3 + 2] += tar[i * 3 + 2];
+  });
+  const vertCount = OrigSize / 3;
+  let v = vec3.create();
+  for (let i = 0; i < vertCount; i += 1) {
+    v = vec3.set(v, res[i * 3 + 0], res[i * 3 + 1], res[i * 3 + 2]);
+    v = vec3.normalize(v, v);
+    res[i * 3 + 0] = v[0];
+    res[i * 3 + 1] = v[1];
+    res[i * 3 + 2] = v[2];
+  }
+  return res;
+}
+
+function toTriangleVec(tris, tar) {
+  const res = Array(tris.length * 3).fill(0.0);
+  tris.forEach((i1, i) => {
+    res[i * 3 + 0] = tar[i1 * 3 + 0];
+    res[i * 3 + 1] = tar[i1 * 3 + 1];
+    res[i * 3 + 2] = tar[i1 * 3 + 2];
+  });
+  return res;
+}
+
+function calcTangents(vertices, uvs, normals, tris, vertCount) {
+  if (!uvs) return [[], []];
+  let tangents = Array(vertices.length).fill(0.0);
+  let bitangents = Array(vertices.length).fill(0.0);
+  let i = 0;
+  let i1;
+  let i2;
+  let i3;
+  let v1 = vec3.create();
+  let v2 = vec3.create();
+  let v3 = vec3.create();
+  let w1 = vec2.create();
+  let w2 = vec2.create();
+  let w3 = vec2.create();
+  let r;
+  let tangent;
+  let bitangent;
+  const imax = vertices.length / 9;
+  let x1;
+  let x2;
+  let y1;
+  let y2;
+  let z1;
+  let z2;
+  let s1;
+  let s2;
+  let t1;
+  let t2;
+  let sdir;
+  let tdir;
+  let n;
+  // let s = "";
+  //              108,                72,               108,                  108,                    108                       12
+  // console.log(`v: ${vertices.length}, uv: ${uvs.length}, n: ${normals.length}, t: ${tangents.length}, bt: ${bitangents.length}, imax: ${imax}`);
+  for (i = 0; i < imax; i += 1) {
+    i1 = i * 6 + 0;
+    i2 = i * 6 + 2;
+    i3 = i * 6 + 4;
+
+    w1 = vec2.set(w1, uvs[i1], uvs[i1 + 1]);
+    w2 = vec2.set(w2, uvs[i2], uvs[i2 + 1]);
+    w3 = vec2.set(w3, uvs[i3], uvs[i3 + 1]);
+
+    i1 = i * 9 + 0;
+    i2 = i * 9 + 3;
+    i3 = i * 9 + 6;
+
+    v1 = vec3.set(v1, vertices[i1], vertices[i1 + 1], vertices[i1 + 2]);
+    v2 = vec3.set(v2, vertices[i2], vertices[i2 + 1], vertices[i2 + 2]);
+    v3 = vec3.set(v3, vertices[i3], vertices[i3 + 1], vertices[i3 + 2]);
+
+    x1 = v2[0] - v1[0];
+    x2 = v3[0] - v1[0];
+    y1 = v2[1] - v1[1];
+    y2 = v3[1] - v1[1];
+    z1 = v2[2] - v1[2];
+    z2 = v3[2] - v1[2];
+
+    s1 = w2[0] - w1[0];
+    s2 = w3[0] - w1[0];
+    t1 = w2[1] - w1[1];
+    t2 = w3[1] - w1[1];
+
+    r = 1.0 / (s1 * t2 - s2 * t1);
+    sdir = vec3.set(vec3.create(), (t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r, (t2 * z1 - t1 * z2) * r);
+    tdir = vec3.set(vec3.create(), (s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r, (s1 * z2 - s2 * z1) * r);
+
+    tangents[i1 + 0] += sdir[0];
+    tangents[i1 + 1] += sdir[1];
+    tangents[i1 + 2] += sdir[2];
+    tangents[i2 + 0] += sdir[0];
+    tangents[i2 + 1] += sdir[1];
+    tangents[i2 + 2] += sdir[2];
+    tangents[i3 + 0] += sdir[0];
+    tangents[i3 + 1] += sdir[1];
+    tangents[i3 + 2] += sdir[2];
+
+    bitangents[i1 + 0] += tdir[0];
+    bitangents[i1 + 1] += tdir[1];
+    bitangents[i1 + 2] += tdir[2];
+    bitangents[i2 + 0] += tdir[0];
+    bitangents[i2 + 1] += tdir[1];
+    bitangents[i2 + 2] += tdir[2];
+    bitangents[i3 + 0] += tdir[0];
+    bitangents[i3 + 1] += tdir[1];
+    bitangents[i3 + 2] += tdir[2];
+  }
+
+  // console.oldLog('vertices');
+  // console.oldLog(vertices);
+  // console.oldLog(uvs);
+  // console.oldLog('tangents');
+  // console.oldLog(tangents);
+  // console.oldLog('normals');
+  // console.oldLog(normals);
+  const vnorms = fromTriangleNormalized(tris, normals, vertCount);
+  tangents = fromTriangleNormalized(tris, tangents, vertCount);
+  bitangents = fromTriangleNormalized(tris, bitangents, vertCount);
+
+  // console.oldLog('tangents');
+  // console.oldLog(tangents);
+
+  for (i = 0; i < vertCount; i += 3) {
+    n = vec3.set(vec3.create(), vnorms[i], vnorms[i + 1], vnorms[i + 2]);
+    tangent = vec3.set(vec3.create(), tangents[i], tangents[i + 1], tangents[i + 2]);
+    bitangent = vec3.set(vec3.create(), bitangents[i], bitangents[i + 1], bitangents[i + 2]);
+    // bitangent = vec3.normalize(bitangent, bitangent);
+
+    tangent = orthogonalize(n, tangent);
+
+    if (vec3.dot(vec3.cross(vec3.create(), n, tangent), bitangent) < 0.0) {
+      tangent = vec3.scale(tangent, tangent, -1.0);
+    }
+
+    tangents[i + 0] = tangent[0];
+    tangents[i + 1] = tangent[1];
+    tangents[i + 2] = tangent[2];
+
+    bitangents[i + 0] = bitangent[0];
+    bitangents[i + 1] = bitangent[1];
+    bitangents[i + 2] = bitangent[2];
+  }
+
+  // tangents = toTriangleVec(tris, tangents);
+  // bitangents = toTriangleVec(tris, bitangents);
+  // console.oldLog(tangents);
+
+  return [tangents, bitangents];
+}
+
 let blendshapeCount = 0;
 export default class Mesh extends Renderable {
   constructor(shaderName, fileData) {
@@ -172,6 +331,7 @@ export default class Mesh extends Renderable {
     this.blendShapeNames = undefined;
     this.blendWeights = undefined;
     this.blendVertexTexture = undefined;
+    this.shaderName = shaderName;
 
     this.LoadObj(fileData);
   }
@@ -182,13 +342,16 @@ export default class Mesh extends Renderable {
     this.wireframe_size = 0;
     this.aabb = mesh.aabb;
     const { vertices } = mesh;
-    let { normals } = mesh;
-    const texcoords = mesh.uv;
+    const { normals } = mesh;
+    const { uvs } = mesh;
     const { vertexColors } = mesh;
     const vIndice = mesh.faces;
     const tIndice = mesh.uv_faces;
     const nIndice = mesh.normal_faces;
     const { meshDict } = mesh;
+    const { faceVertices } = mesh;
+    const { faceUVs } = mesh;
+    const { faceNormals } = mesh;
     // console.log(loadName);
     if (loadName && (!meshDict || Object.keys(meshDict).length === 0 || !(loadName in meshDict))) {
       loadName = undefined;
@@ -196,16 +359,8 @@ export default class Mesh extends Renderable {
     // console.log(mesh);
     // console.log(vIndice);
 
-    let sameIndices = [];
     const faces = [];
     let vID = -1;
-    let i0;
-    let i1;
-    let i2;
-    let v0;
-    let v1;
-    let v2;
-    let nor;
     let t0;
     let t1;
     let n0;
@@ -233,49 +388,12 @@ export default class Mesh extends Renderable {
       addWireLines(vIndice[i], vIndice[i + 1], vIndice[i + 2], wireframeMap, wireframeIndices);
     }
 
-    if (nIndice.length === 0) {
-      normals = [...Array(vertices.length).fill(0.0)];
-      sameIndices = [...Array(vertices.length).fill(0.0)];
-      for (i = 0; i < vIndice.length; i += 3) {
-        i0 = vIndice[i];
-        i1 = vIndice[i + 1];
-        i2 = vIndice[i + 2];
-        v0 = [vertices[i0 * 3], vertices[(i0 * 3) + 1], vertices[(i0 * 3) + 2]];
-        v1 = [vertices[i1 * 3], vertices[(i1 * 3) + 1], vertices[(i1 * 3) + 2]];
-        v2 = [vertices[i2 * 3], vertices[(i2 * 3) + 1], vertices[(i2 * 3) + 2]];
-
-        nor = calcNormal(v0, v1, v2);
-        nIndice.push(i0);
-        nIndice.push(i1);
-        nIndice.push(i2);
-        sameIndices[i0 * 3] += 1.0;
-        sameIndices[(i0 * 3) + 1] += 1.0;
-        sameIndices[(i0 * 3) + 2] += 1.0;
-        sameIndices[i1 * 3] += 1.0;
-        sameIndices[(i1 * 3) + 1] += 1.0;
-        sameIndices[(i1 * 3) + 2] += 1.0;
-        sameIndices[i2 * 3] += 1.0;
-        sameIndices[(i2 * 3) + 1] += 1.0;
-        sameIndices[(i2 * 3) + 2] += 1.0;
-
-        normals[i0 * 3] += nor[0];
-        normals[(i0 * 3) + 1] += nor[1];
-        normals[(i0 * 3) + 2] += nor[2];
-        normals[i1 * 3] += nor[0];
-        normals[(i1 * 3) + 1] += nor[1];
-        normals[(i1 * 3) + 2] += nor[2];
-        normals[i2 * 3] += nor[0];
-        normals[(i2 * 3) + 1] += nor[1];
-        normals[(i2 * 3) + 2] += nor[2];
-      }
-      for (i = normals.length - 1; i >= 0; i -= 1) {
-        normals[i] /= sameIndices[i];
-      }
-      // eslint-disable-next-line no-param-reassign
-      mesh.normals = normals;
-      // eslint-disable-next-line no-param-reassign
-      mesh.normal_faces = nIndice;
-    }
+    const [tangents, bitangents] = calcTangents(faceVertices, faceUVs, faceNormals, vIndice, vertices.length);
+    // console.log('tangents');
+    // console.oldLog(tangents);
+    // console.log('bitangents');
+    // console.log(bitangents);
+    // console.oldLog(vertices);
 
     for (i = ist; i < imax; i += 1) {
       vID = vIndice[i];
@@ -283,8 +401,8 @@ export default class Mesh extends Renderable {
         t0 = undefined;
         t1 = undefined;
       } else {
-        t0 = texcoords[tIndice[i] * 2];
-        t1 = texcoords[(tIndice[i] * 2) + 1];
+        t0 = uvs[tIndice[i] * 2];
+        t1 = uvs[(tIndice[i] * 2) + 1];
       }
       if (nIndice.length === 0) {
         n0 = undefined;
@@ -305,6 +423,12 @@ export default class Mesh extends Renderable {
         n0,
         n1,
         n2,
+        tangents[vID * 3],
+        tangents[vID * 3 + 1],
+        tangents[vID * 3 + 2],
+        bitangents[vID * 3],
+        bitangents[vID * 3 + 1],
+        bitangents[vID * 3 + 2],
         vertexColors[vID * 3],
         vertexColors[vID * 3 + 1],
         vertexColors[vID * 3 + 2]);
@@ -318,7 +442,8 @@ export default class Mesh extends Renderable {
       if (vertexColors.length > 0) stride += 3;
     } else if (vertexColors.length > 0) stride += 3;
     if (normals.length > 0) stride += 3;
-    if (texcoords.length > 0) stride += 2;
+    if (uvs.length > 0) stride += 2;
+    if (tangents.length > 0 && bitangents.length > 0) stride += 6;
 
     let size = 3;
     this.attributeDatas.push({
@@ -349,10 +474,22 @@ export default class Mesh extends Renderable {
         offset += size;
       }
 
-      if (texcoords.length > 0) {
+      if (uvs.length > 0) {
         size = 2;
         this.attributeDatas.push({
           name: 'texcoord', size, offset, stride,
+        });
+        offset += size;
+      }
+
+      if (tangents.length > 0 && bitangents.length > 0) {
+        size = 3;
+        this.attributeDatas.push({
+          name: 'tangent', size, offset, stride,
+        });
+        offset += size;
+        this.attributeDatas.push({
+          name: 'bitangent', size, offset, stride,
         });
         offset += size;
       }
@@ -390,7 +527,7 @@ export default class Mesh extends Renderable {
     });
     this.uploadListWireframe(wireframeFaces);
     // if (add_vertex_color) {
-    //     // this.material.setUniformData('texture', getDefaultTextures()["black"]);
+    //     // this.material.setUniformData('uAlbedo', getDefaultTextures()["black"]);
     // }
   }
 
@@ -425,7 +562,7 @@ export default class Mesh extends Renderable {
     this.material.setUniformData('color', [0.6, 0.35, 0.1, 1.0]);
   }
 
-  setFace(faces, id, x, y, z, tx, ty, nx, ny, nz, cx = undefined, cy = undefined, cz = undefined) {
+  setFace(faces, id, x, y, z, tx, ty, nx, ny, nz, tex, tey, tez, bix, biy, biz, cx = undefined, cy = undefined, cz = undefined) {
     faces.push(parseFloat(x));
     faces.push(parseFloat(y));
     faces.push(parseFloat(z));
@@ -455,6 +592,16 @@ export default class Mesh extends Renderable {
     if (tx !== undefined && ty !== undefined) {
       faces.push(parseFloat(tx));
       faces.push(parseFloat(ty));
+    }
+
+    if (tex !== undefined && tey !== undefined && tez !== undefined && bix !== undefined && biy !== undefined && biz !== undefined) {
+      faces.push(parseFloat(tex));
+      faces.push(parseFloat(tey));
+      faces.push(parseFloat(tez));
+
+      faces.push(parseFloat(bix));
+      faces.push(parseFloat(biy));
+      faces.push(parseFloat(biz));
     }
 
     this.size += 1;
@@ -564,108 +711,6 @@ export default class Mesh extends Renderable {
     }
   }
 
-  LoadBlendShape(binData) {
-    this.bytes = new Uint8Array(binData);
-    this.blendShapeSize = this.readInt();
-
-    // console.log(this.blendShapeSize);
-
-    this.blendWeights = new Float32Array(this.blendShapeSize);
-    this.verticeSize = this.readInt();
-
-    // console.log(this.verticeSize);
-
-    this.blendShapeNames = [];
-    for (let i = 0; i < this.blendShapeSize; i += 1) {
-      const size = this.readInt();
-      // console.log(size);
-      const name = this.readString(size);
-      this.blendShapeNames.push(name);
-    }
-    const texSize = this.readInt();
-    let texBytes = this.readBytes(texSize * texSize * 3 * 4);
-    texBytes = new Uint8Array(texBytes);
-    texBytes = new Float32Array(texBytes.buffer);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    const texOptions = { Wrap: TextureParamType.Clamp_To_Edge, Filter: TextureParamType.Nearest };
-    this.blendVertexTexture = new Texture2D(
-      gl.RGB, gl.FLOAT, false, texSize, texSize, texBytes, texOptions,
-    );
-    this.blendShapeTextureSize = texSize;
-    this.createBlendShapeMaterial(texSize, false);
-  }
-
-  readBytes(size) {
-    if (this.bytes.length < size) throw new Error(`this.bytes.length:${this.bytes.length} < ${size}`);
-    const data = this.bytes.subarray(0, size);
-    this.bytes = this.bytes.subarray(size);
-    return data;
-  }
-
-  readString(s) {
-    const size = Math.min(s, this.bytes.length);
-    let a = '';
-    for (let c = 0; c < size; c += 1) a += String.fromCharCode(this.bytes[c]);
-    this.bytes = this.bytes.subarray(size);
-    return a;
-  }
-
-  readFloat() {
-    let a = new Uint8Array(this.bytes);
-    a = new Float32Array(a.buffer);
-    this.bytes = this.bytes.subarray(4);
-    return a[0];
-  }
-
-  readInt() {
-    const a = this.bytes;
-    // eslint-disable-next-line no-mixed-operators
-    const c = a[0] | a[1] << 8 | a[2] << 16 | a[3] << 24;
-    this.bytes = a.subarray(4);
-    return c;
-  }
-
-  LoadBlendShapeJson(json, texture) {
-    const jsonObj = JSON.parse(json);
-    this.blendShapeSize = jsonObj.size;
-    this.blendWeights = new Float32Array(this.blendShapeSize);
-    this.verticeSize = jsonObj.vc;
-    this.blendShapeNames = jsonObj.names;
-    this.blendVertexTexture = texture;
-    const texSize = jsonObj.texture_size;
-    this.createBlendShapeMaterial(texSize, false);
-  }
-
-  parseBlendShape(json, verticeSize, texSize) {
-    const jsonObj = JSON.parse(json);
-
-    const { frameDatas } = jsonObj;
-    this.blendShapeSize = frameDatas.length;
-    this.blendShapeSize = Math.min(
-      this.blendShapeSize, gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS) - 9,
-    );
-    this.blendWeights = new Float32Array(this.blendShapeSize);
-    this.verticeSize = verticeSize;
-    const texOptions = { Wrap: TextureParamType.Clamp_To_Edge, Filter: TextureParamType.Nearest };
-
-    this.blendShapeNames = [];
-    const vertices = new Float32Array(texSize * texSize * 3);
-
-    for (let i = 0, ind = 0; i < this.blendShapeSize; i += 1) {
-      const verts = frameDatas[i].vertices;
-      this.blendShapeNames.push(`m_${frameDatas[i].name}`);
-      const len = verts.length;
-      for (let j = 0; j < len; j += 1) {
-        vertices[ind] = verts[j];
-        ind += 1;
-      }
-    }
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-    this.blendVertexTexture = new Texture2D(
-      gl.RGB, gl.FLOAT, false, texSize, texSize, vertices, texOptions,
-    );
-  }
-
   SetBlendWeight(index, value) {
     this.blendWeights[index] = value;
     this.material.setUniformData('blendWeights', this.blendWeights);
@@ -689,6 +734,10 @@ export default class Mesh extends Renderable {
       mesh.buffers.max, mesh.buffers.min,
     ];
 
+    // console.oldLog(mesh);
+
+    const [tangents, bitangents] = calcTangents(mesh.buffers.vertex, mesh.buffers.uvs[0], mesh.buffers.normal);
+
     const faces = [];
     let imax = mesh.buffers.vertexIndex.length;
     for (let i = 0; i < imax; i += 1) {
@@ -698,6 +747,8 @@ export default class Mesh extends Renderable {
         mesh.buffers.vertex[i * 3], mesh.buffers.vertex[i * 3 + 1], mesh.buffers.vertex[i * 3 + 2],
         mesh.buffers.uvs[0][i * 2], mesh.buffers.uvs[0][i * 2 + 1],
         mesh.buffers.normal[i * 3], mesh.buffers.normal[i * 3 + 1], mesh.buffers.normal[i * 3 + 2],
+        tangents[i * 3], tangents[i * 3 + 1], tangents[i * 3 + 2],
+        bitangents[i * 3], bitangents[i * 3 + 1], bitangents[i * 3 + 2],
         mesh.buffers.colors[i * 3], mesh.buffers.colors[i * 3 + 1], mesh.buffers.colors[i * 3 + 2],
       );
     }
@@ -713,6 +764,7 @@ export default class Mesh extends Renderable {
     } else if (mesh.buffers.colors.length > 0) stride += 3;
     if (mesh.buffers.normal.length > 0) stride += 3;
     if (mesh.buffers.uvs.length > 0) stride += 2;
+    if (tangents.length > 0 && bitangents.length > 0) stride += 6;
 
     let size = 3;
     this.attributeDatas.push({
@@ -743,6 +795,18 @@ export default class Mesh extends Renderable {
         size = 2;
         this.attributeDatas.push({
           name: 'texcoord', size, offset, stride,
+        });
+        offset += size;
+      }
+
+      if (tangents.length > 0 && bitangents.length > 0) {
+        size = 3;
+        this.attributeDatas.push({
+          name: 'tangent', size, offset, stride,
+        });
+        offset += size;
+        this.attributeDatas.push({
+          name: 'bitangent', size, offset, stride,
         });
         offset += size;
       }
@@ -814,7 +878,7 @@ export default class Mesh extends Renderable {
   }
 
   createBlendShapeMaterial(texSize, doScale, gloss = 30.0) {
-    const blendShapeShader = Shader.FindShaderSource('blendshape');
+    const blendShapeShader = Shader.FindShaderSource(this.shaderName);
     const replaceDefines = `#define BLENDSHAPE_SIZE ${this.blendShapeSize}\n`
       + `#define BLENDSHAPE_TEX_SIZE ${texSize}.0\n`
       + 'attribute float vert_id;\n';
@@ -859,14 +923,13 @@ export default class Mesh extends Renderable {
     replaceGLPosition += '}\n'
       + 'gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);\n';
     blendshapeCount += 1;
-    Shader.ShaderMap().push({
-      name: `blendshape${blendshapeCount}`,
+    Shader.ShaderMap()[`blendshape${blendshapeCount}`] = {
       vs: blendShapeShader.vs.slice()
-        .replace('DEFINES', replaceDefines)
-        .replace('UNIFORMS', replaceUniforms)
+        .replace('#pragma DEFINES', replaceDefines)
+        .replace('#pragma UNIFORMS', replaceUniforms)
         .replace(replaceGLPositionSrc, replaceGLPosition),
       fs: blendShapeShader.fs.slice(),
-    });
+    };
     this.material = new Material(`blendshape${blendshapeCount}`);
     this.material.setUniformData('verticeSize', this.verticeSize);
     this.material.setUniformData('blendVertexTexture', this.blendVertexTexture);
@@ -874,14 +937,13 @@ export default class Mesh extends Renderable {
     this.material.setUniformData('gloss', gloss);
     // console.log("loaded");
     const debugShader = Shader.FindShaderSource('debug');
-    Shader.ShaderMap().push({
-      name: `debug${blendshapeCount}`,
+    Shader.ShaderMap()[`debug${blendshapeCount}`] = {
       vs: debugShader.vs.slice()
-        .replace('DEFINES', replaceDefines)
-        .replace('UNIFORMS', replaceUniforms)
+        .replace('#pragma DEFINES', replaceDefines)
+        .replace('#pragma UNIFORMS', replaceUniforms)
         .replace(replaceGLPositionSrc, replaceGLPosition),
       fs: debugShader.fs.slice(),
-    });
+    };
     // console.log(shadersMap);
     // console.log(this.verticeSize);
     this.wireframeMaterial = new Material(`debug${blendshapeCount}`);

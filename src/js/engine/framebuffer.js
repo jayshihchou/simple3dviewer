@@ -1,5 +1,5 @@
-﻿/* eslint-disable max-classes-per-file */
-/* eslint-disable no-alert */
+﻿/* eslint-disable no-console */
+/* eslint-disable max-classes-per-file */
 import { gl } from './gl.js';
 
 let framebufferBinding = null;

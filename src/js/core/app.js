@@ -1,17 +1,18 @@
 ﻿import { vec3 } from '../lib/gl-matrix/index.js';
-import JSZip from '../lib/jszip.min.js';
+// import JSZip from '../lib/jszip.min.js';
 import fbxloader from '../lib/fbxloader.js';
 
 import { gl, initGL } from '../engine/gl.js';
-import { isMobile, logger } from '../engine/logger.js';
+import { logger } from '../engine/logger.js';
 import { GameNode } from '../engine/gamenode.js';
 import { Mesh } from '../engine/mesh.js';
 import { Camera, allCameras } from '../engine/camera.js';
 import { allLights, Light } from '../engine/light.js';
+import { input } from '../engine/inputmanager.js';
 import {
-  input, screenSize, resizeListeners, realScreenSize,
-  setFrameDirty, getFrameDirty, updateScreenSize,
-} from '../engine/inputmanager.js';
+  setFrameDirty, getFrameDirty, screenSize,
+  resizeListeners, realScreenSize, updateScreenSize,
+} from '../engine/utils.js';
 import { Texture2D } from '../engine/texture.js';
 import { timer } from '../engine/timer.js';
 import { ObjLoader } from '../engine/objLoader.js';
@@ -130,21 +131,23 @@ function onFilesEnter(files) {
         reader.addEventListener('load', function loadtexture() {
           const tex = new Texture2D();
           const url = this.result;
+          const filelower = f.name.toLowerCase();
+          let uniforName = 'uAlbedo';
+          if (filelower.includes('normal')) {
+            uniforName = 'uNormal';
+          } else if (filelower.includes('spec')) {
+            uniforName = 'uSpecular';
+          } else if (filelower.includes('gloss')) {
+            uniforName = 'uGloss';
+          } else if (filelower.includes('translucency')) {
+            uniforName = 'uTranslucency';
+          } else if (filelower.includes('env')) {
+            uniforName = 'uEnvir';
+          }
           tex.loadFromUrl(url, () => {
-            self.node.renderable.material.setUniformData('texture', tex);
+            // console.log(`set ${uniforName} for ${f.name}`);
+            self.node.renderable.material.setUniformData(uniforName, tex);
           });
-        }, false);
-        reader.readAsDataURL(f);
-      } else if (ext === 'blendshape' || ext === 'bin') {
-        const reader = new FileReader();
-        reader.addEventListener('load', function loadblendshape() {
-          self.loadBlendShape(this.result);
-        }, false);
-        reader.readAsDataURL(f);
-      } else if (ext === 'zip') {
-        const reader = new FileReader();
-        reader.addEventListener('load', function loadzip() {
-          self.loadZip(this.result, undefined);
         }, false);
         reader.readAsDataURL(f);
       } else if (ext === 'fbx') {
@@ -269,7 +272,7 @@ export default class Application {
     const self = this;
     const tex = new Texture2D();
     tex.loadFromUrl(url, () => {
-      self.node.renderable.material.setUniformData('texture', tex);
+      self.node.renderable.material.setUniformData('uAlbedo', tex);
     }, token);
   }
 
@@ -351,56 +354,6 @@ export default class Application {
     }, undefined, token);
   }
 
-  loadBlendShapeContents(contents) {
-    this.node.renderable.LoadBlendShape(contents);
-  }
-
-  loadBlendShapeJson(json, tex) {
-    this.node.renderable.LoadBlendShapeJson(json, tex);
-  }
-
-  loadZip(url, token) {
-    const self = this;
-    ReadFile.readBinary(url, (b) => {
-      JSZip.loadAsync(b).then((contents) => {
-        if (contents.file('blendshape.json') === null) {
-          contents.file('blendshapes.bin').async('arraybuffer').then((content) => {
-            resourceManager.addData('blendshapes.bin', content);
-            self.loadBlendShapeFromResource();
-          });
-        } else {
-          contents.file('blendshape.json').async('string').then((jsonContent) => {
-            resourceManager.addData('blendshape.json', jsonContent);
-            contents.file('blendshape.png').async('base64').then((content) => {
-              const tex = new Texture2D();
-              tex.loadFromUrl(`data:png;base64,${content}`, () => {
-                resourceManager.addData('blendshape.png', tex);
-                self.loadBlendShapeFromResource();
-              });
-            });
-          });
-        }
-      });
-    }, undefined, token);
-  }
-
-  loadBlendShapeFromResource() {
-    // const self = this;
-    if (isMobile) {
-      const json = resourceManager.getFile('blendshape.json');
-      const texture = resourceManager.getFile('blendshape.png');
-      if (json !== null && texture !== null) {
-        this.loadBlendShapeJson(json.data, texture.data);
-      }
-    } else {
-      const content = resourceManager.getFile('blendshapes.bin');
-      if (content !== null) {
-        this.loadBlendShapeContents(content.data);
-      }
-    }
-    this.triggerOnLoadMesh(this.node.renderable);
-  }
-
   loadFBX(url, token) {
     const self = this;
     fbxloader.fbxloader.load(url, (fbxTree) => {
@@ -428,7 +381,7 @@ export default class Application {
         }
         self.other_nodes.splice(0, self.other_nodes.length);
         for (let i = 1; i < meshes.length; i += 1) {
-          const node = new GameNode(new Mesh('default', cubeText), `mesh_${i}`);
+          const node = new GameNode(new Mesh('default_orig', cubeText), `mesh_${i}`);
           node.renderable.LoadFBX(meshes[i], fbxTree);
           const t = meshes[i].transform;
           if ('euler' in t) node.transform.euler = t.euler;
