@@ -127,6 +127,14 @@ export default class Rect {
       }
     }
   }
+
+  toLocal(vec) {
+    return [vec[0] - this.min[0], vec[1] - this.min[1]];
+  }
+
+  toString() {
+    return `(${this.x}, ${this.y}, ${this.width}, ${this.height})`;
+  }
 }
 
 export { Rect };

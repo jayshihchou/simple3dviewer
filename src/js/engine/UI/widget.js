@@ -14,6 +14,8 @@ export default class Widget extends Renderable {
     this.onTouch = undefined;
     this.onTouchEnd = undefined;
     this.receiveTouchEvent = false;
+    this.ui = true;
+    this.depth = 0;
   }
 
   get alpha() { return this.color[3]; }
@@ -43,6 +45,21 @@ export default class Widget extends Renderable {
     this.material.setUniformData('widgetRect', this.rect.array);
 
     super.draw(matrix, camPos, viewMat, projMat, material);
+  }
+
+  setRect(x, y, width, height) {
+    this.rect.set(x, y, width, height);
+    return this;
+  }
+
+  setRectRelative(x, y, width, height) {
+    this.rect.setRelative(x, y, width, height);
+    return this;
+  }
+
+  setRectSize(width, height) {
+    this.rect.set(this.rect.x, this.rect.y, width, height);
+    return this;
   }
 
   OnTouchStart(e) {

@@ -1,19 +1,17 @@
 import { Widget } from './widget.js';
-import { Material } from '../material.js';
+import { Material, BlendType } from '../material.js';
 import { gl } from '../gl.js';
 import { Texture2D } from '../texture.js';
 
 export default class Sprite extends Widget {
   constructor(texPath = undefined, tex = undefined, shaderName = undefined) {
-    super(null);
-    const shader = shaderName || 'sprite';
-    this.material = new Material(shader);
+    super(new Material(shaderName || 'sprite', BlendType.Alpha));
 
     if (tex) {
       this.texture = tex;
     } else {
       this.texture = new Texture2D(
-        gl.RGBA, gl.UNSIGNED_BYTE, false, 1, 1, new Uint8Array([255, 255, 255, 255]),
+        gl.RGBA, gl.UNSIGNED_BYTE, 1, 1, new Uint8Array([255, 255, 255, 255]),
       );
     }
     if (texPath) this.texture.loadFromUrl(texPath);

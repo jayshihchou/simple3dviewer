@@ -12,9 +12,11 @@ export default class Slider {
     this.rect.onChangeTargets.push(this);
     let node = new GameNode(new Sprite(), 'slider_thumb');
     this.thumb = node.renderable;
+    this.thumb.depth = 1;
     node = new GameNode(new Sprite(), 'slider_background');
     this.background = node.renderable;
     this.background.color = [0.3, 0.3, 0.3, 1.0];
+    this.background.depth = 0;
     this.OnRectChanged(this.rect);
 
     this.thumbPressing = false;
