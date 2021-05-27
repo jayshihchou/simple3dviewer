@@ -144,26 +144,29 @@ function onFilesEnter(files, p) {
           });
         }, false);
         reader.readAsDataURL(f);
-      } else if (ext === 'obj') {
-        const reader = new FileReader();
-        reader.onloadend = (function onloadend(r) {
-          return () => {
-            self.loadObj(r.result, node);
-          };
-        }(reader));
-        reader.readAsText(f);
-      } else if (ext === 'fbx') {
-        const reader = new FileReader();
-        reader.addEventListener('load', () => {
-          self.loadFBX(reader.result, undefined, node);
-        }, false);
-        reader.readAsDataURL(f);
-      } else if (ext === 'hair') {
-        const reader = new FileReader();
-        reader.addEventListener('load', () => {
-          self.loadHair(reader.result, undefined, node);
-        }, false);
-        reader.readAsDataURL(f);
+      } else {
+        node.name = f.name;
+        if (ext === 'obj') {
+          const reader = new FileReader();
+          reader.onloadend = (function onloadend(r) {
+            return () => {
+              self.loadObj(r.result, node);
+            };
+          }(reader));
+          reader.readAsText(f);
+        } else if (ext === 'fbx') {
+          const reader = new FileReader();
+          reader.addEventListener('load', () => {
+            self.loadFBX(reader.result, undefined, node);
+          }, false);
+          reader.readAsDataURL(f);
+        } else if (ext === 'hair') {
+          const reader = new FileReader();
+          reader.addEventListener('load', () => {
+            self.loadHair(reader.result, undefined, node);
+          }, false);
+          reader.readAsDataURL(f);
+        }
       }
     }
   }
@@ -358,11 +361,13 @@ export default class Application {
     }
   }
 
-  loadMesh(url, token, callback, onfailed) {
+  loadMesh(url, token, callback, onfailed, createNewNode = false) {
     const self = this;
     ReadFile.read(url, (contents) => {
       if (contents) {
-        self.loadObj(contents, self.node);
+        let { node } = self;
+        if (createNewNode) node = self.GetNextNode();
+        self.loadObj(contents, node);
         if (callback) callback();
       } else if (onfailed) onfailed();
     }, undefined, token);
@@ -423,11 +428,13 @@ export default class Application {
     }, token);
   }
 
-  loadTexture(url, token = undefined) {
+  loadTexture(url, token = undefined, toNodes = undefined) {
     const self = this;
     const tex = new Texture2D();
     const filelower = url.toLowerCase();
     let uniforName = 'uAlbedo';
+    let nodes = toNodes;
+    if (!nodes) nodes = self.nodes;
     if (filelower.includes('normal')) {
       uniforName = 'uNormal';
     } else if (filelower.includes('spec')) {
@@ -441,9 +448,9 @@ export default class Application {
     }
     tex.loadFromUrl(url, () => {
       // console.log(`loadTexture: ${url}`);
-      for (let i = 0; i < self.nodes.length; i += 1) {
-        self.nodes[i].renderable.material.setUniformData(uniforName, tex, true);
-      }
+      nodes.forEach((n) => {
+        n.renderable.material.setUniformData(uniforName, tex, true);
+      });
     }, token);
   }
 
@@ -466,6 +473,10 @@ export default class Application {
     this.nodeCount += 1;
 
     return node;
+  }
+
+  GetLastNode() {
+    return this.nodes[this.nodes.length - 1];
   }
 }
 
