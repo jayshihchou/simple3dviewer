@@ -1,6 +1,6 @@
 {
   "name": "simple3dviewer",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "simple 3d viewer",
   "main": "./core/main.js",
   "scripts": {
@@ -13,15 +13,16 @@
     "@typescript-eslint/parser": "^4.14.1",
     "eslint": "^7.18.0",
     "eslint-config-airbnb-base": "^14.2.1",
-    "eslint-plugin-import": "^2.22.1"
+    "eslint-plugin-import": "^2.22.1",
+    "webpack-cli": "^4.4.0"
   },
   "dependencies": {},
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jayshihchou/simple3dviewer.git"
+    "url": "git+https://gitlab.com/jayshihchou/simple3dviewer.git"
   },
   "bugs": {
-    "url": "https://github.com/jayshihchou/simple3dviewer/issues"
+    "url": "https://gitlab.com/jayshihchou/simple3dviewer/issues"
   },
-  "homepage": "https://github.com/jayshihchou/simple3dviewer#readme"
+  "homepage": "https://gitlab.com/jayshihchou/simple3dviewer#readme"
 }
