@@ -17,8 +17,6 @@ export default class CameraControl {
     this.node = app.node;
     this.camera = app.camera;
 
-    input.eventListeners.push(this);
-
     this.scale_min = 0.4;
     this.scale_max = 20.0;
     this.scale_speed = 1.0;
@@ -39,7 +37,11 @@ export default class CameraControl {
       this.button1.notify.push(this);
       this.button1.enabled = false;
     }
+
+    this.alt = false;
+
     app.addEvent('OnLoadMesh', this.setScale, this);
+    input.eventListeners.push(this);
   }
 
   OnClick(button) {
@@ -123,6 +125,9 @@ export default class CameraControl {
       vec3.add(target, target, right);
       this.look_at_target_offset = target;
       this.button1.enabled = true;
+    } else if (this.alt) {
+      this.distance_to_object -= (deltaX - deltaY) * timer.deltaTime * 0.05;
+      this.target_dist = this.distance_to_object;
     } else {
       // left / right button
       const qEuler = this.camera.transform.euler;
@@ -192,6 +197,32 @@ export default class CameraControl {
     }
 
     this.camera.updateProjectionMatrix();
+  }
+
+  OnKeyDown(e) {
+    if (e.key === 'Alt') {
+      this.alt = true;
+    }
+  }
+
+  OnKeyUp(e) {
+    if (e.key === 'Alt') {
+      this.alt = false;
+    }
+  }
+
+  OnMouseOutWindow() {
+    if (this.alt) {
+      this.altOut = true;
+    }
+    this.alt = false;
+  }
+
+  OnMouseEnterWindow() {
+    if (this.altOut) {
+      this.altOut = false;
+      this.alt = input.keys.Alt !== 0;
+    }
   }
 }
 

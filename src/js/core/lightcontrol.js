@@ -1,5 +1,6 @@
 import { input } from '../engine/inputmanager.js';
 import { allLights } from '../engine/light.js';
+import { timer } from '../engine/timer.js';
 import { setFrameDirty, clamp } from '../engine/utils.js';
 import { vec3 } from '../lib/gl-matrix/index.js';
 import { addOnStart } from './app.js';
@@ -25,6 +26,7 @@ export default class LightControl {
     this.scale_max = 10.0;
     this.maxDist = 0.0;
     this.look_at_target = vec3.create();
+    this.alt = false;
     input.eventListeners.push(this);
     app.addEvent('OnLoadMesh', this.setScale, this);
   }
@@ -39,13 +41,42 @@ export default class LightControl {
       this.mouseControl = true;
       this.light.debug = this.mouseControl;
       input.lockTarget = this;
+    } else if (e.key === 'Alt') {
+      this.alt = true;
     }
   }
 
   OnKeyUp() {
     this.mouseControl = false;
+    this.alt = false;
     this.light.debug = this.mouseControl;
     input.lockTarget = undefined;
+  }
+
+  OnMouseOutWindow() {
+    if (this.mouseControl) {
+      this.mouseControlOut = true;
+    }
+    if (this.alt) {
+      this.altOut = true;
+    }
+    this.mouseControl = false;
+    this.alt = false;
+    if (this.light.debug) {
+      this.light.debug = this.mouseControl;
+    }
+  }
+
+  OnMouseEnterWindow() {
+    if (this.mouseControlOut) {
+      this.mouseControlOut = false;
+      this.mouseControl = input.keys.Shift !== 0;
+      this.light.debug = this.mouseControl;
+    }
+    if (this.altOut) {
+      this.altOut = false;
+      this.alt = input.keys.Alt !== 0;
+    }
   }
 
   OnTouchStart() {
@@ -66,6 +97,8 @@ export default class LightControl {
     const { deltaX, deltaY } = e;
     if (e.type === 4) {
       // wheel button
+    } else if (this.alt) {
+      this.target_dist -= (deltaX - deltaY) * timer.deltaTime * 0.05;
     } else {
       // left / right button
       const qEuler = this.light.transform.euler;
