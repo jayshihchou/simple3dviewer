@@ -104,6 +104,11 @@ function onMouseMove(e) {
 function onMouseEnterEvent(e) {
   input.mouseDown = input.mouseDownOut !== 0 && input.mouseDownOut === e.buttons;
   input.anyObjectTouched = input.mouseDown && input.anyObjectTouchedOut;
+
+  input.keys.Alt = e.altKey ? 1 : 0;
+  input.keys.Control = e.ctrlKey ? 1 : 0;
+  input.keys.Shift = e.shiftKey ? 1 : 0;
+
   if (input.eventListeners.length > 0) {
     for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
       if (input.eventListeners[i].OnMouseEnterWindow !== undefined) {
@@ -205,33 +210,43 @@ function onDragFile(e) {
 
 function onKeyDown(e) {
   setFrameDirty();
-  if (input.eventListeners.length > 0) {
-    for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
-      if (input.eventListeners[i].OnKeyDown) {
-        input.eventListeners[i].OnKeyDown(e);
+  if (!input.keys[e.key]) {
+    // console.log(`keydown ${e.key}`);
+    input.keys[e.key] = 1;
+    if (input.eventListeners.length > 0) {
+      for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
+        if (input.eventListeners[i].OnKeyDown) {
+          input.eventListeners[i].OnKeyDown(e);
+        }
       }
     }
+  } else {
+    // console.log(`keypressing ${e.key}`);
+    if (input.eventListeners.length > 0) {
+      for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
+        if (input.eventListeners[i].OnKeyPress) {
+          if (this.warningFirstTime) {
+            this.warningFirstTime = true;
+            // eslint-disable-next-line no-console
+            console.warn('input manager warning: key pressing event only fire for last key.');
+          }
+          input.eventListeners[i].OnKeyPress(e);
+        }
+      }
+    }
+    input.keys[e.key] = 1;
   }
 }
 
 function onKeyUp(e) {
   setFrameDirty();
+
   // console.log(`keyup ${e.key}`);
+  input.keys[e.key] = 0;
   if (input.eventListeners.length > 0) {
     for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
       if (input.eventListeners[i].OnKeyUp) {
         input.eventListeners[i].OnKeyUp(e);
-      }
-    }
-  }
-}
-
-function onKeyPress(e) {
-  setFrameDirty();
-  if (input.eventListeners.length > 0) {
-    for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
-      if (input.eventListeners[i].OnKeyPress) {
-        input.eventListeners[i].OnKeyPress(e);
       }
     }
   }
@@ -266,7 +281,7 @@ class InputManager {
 
     document.addEventListener('keydown', onKeyDown, false);
     document.addEventListener('keyup', onKeyUp, false);
-    document.addEventListener('keypress', onKeyPress, false);
+    // document.addEventListener('keypress', onKeyPress, false);
 
     this.container.onmousedown = onMouseDown;
     this.container.onmouseup = onMouseUp;
@@ -287,6 +302,9 @@ class InputManager {
     this.anyObjectTouched = false;
     this.anyObjectTouchedOut = false;
     this.eventListeners = [];
+
+    this.keys = {};
+    this.warningFirstTime = true;
   }
 
   checkHover(e) {
