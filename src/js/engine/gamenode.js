@@ -1,22 +1,32 @@
 ﻿import { Transform } from './transformation.js';
-import { Widget } from './UI/widget.js';
 
 const gameNodeGroup = [];
+const debugNodes = [];
 const emptyGameNodeIDs = [];
 let nodeID = -1;
+let renderGroup = [];
+let renderGroupUI = [];
+let needToSort = false;
+let needToSortUI = false;
 
 export default class GameNode {
-  constructor(renderable, name = undefined) {
+  constructor(renderable, name = undefined, debugNode = false) {
     this.renderable = renderable;
     if (this.renderable !== null && this.renderable !== undefined) this.renderable.gameNode = this;
     this.transform = new Transform();
     this.components = [];
     this.id = GameNode.getEmptyID();
-    this.ui = this.renderable instanceof Widget;
-    this.name = `node (${this.id}): `;
-    if (name !== undefined) this.name += name;
+    this.ui = this.renderable.ui;
+    if (debugNode) {
+      this.name = (name !== undefined) ? name : `unnamed node (${this.id}): `;
+    } else {
+      this.name = `node (${this.id}): `;
+      if (name !== undefined) this.name += name;
+    }
 
+    if (debugNode) debugNodes.push(this);
     gameNodeGroup[this.id] = this;
+    GameNode.sortRenderingGroup();
 
     return this;
   }
@@ -31,6 +41,56 @@ export default class GameNode {
 
   static getGroup() {
     return gameNodeGroup;
+  }
+
+  static getDebugGroup() {
+    return debugNodes;
+  }
+
+  static sortRenderingGroup() {
+    needToSort = true;
+    needToSortUI = true;
+  }
+
+  static getRenderingGroup() {
+    if (needToSort) {
+      needToSort = false;
+      renderGroup = [];
+      gameNodeGroup.forEach((node) => {
+        if (node && node.renderable
+          && !node.renderable.ui
+          && node.renderable.material && node.renderable.material.blendType === 0) {
+          renderGroup.push(node);
+        }
+      });
+      gameNodeGroup.forEach((node) => {
+        if (
+          node
+          && node.renderable
+          && !node.renderable.ui
+          && node.renderable.material
+          && (node.renderable.material.blendType === 2
+            || node.renderable.material.blendType === 1)) {
+          renderGroup.push(node);
+        }
+      });
+    }
+    return renderGroup;
+  }
+
+  static getRenderingGroupUI() {
+    if (needToSortUI) {
+      needToSortUI = false;
+      renderGroupUI = [];
+      gameNodeGroup.forEach((node) => {
+        if (node && node.renderable
+          && node.renderable.ui) {
+          renderGroupUI.push(node);
+        }
+      });
+      renderGroupUI = renderGroupUI.sort((a, b) => a.renderable.depth - b.renderable.depth);
+    }
+    return renderGroupUI;
   }
 
   static destroy(gameNode) {
