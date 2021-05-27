@@ -61,6 +61,7 @@ export default class Hierarchy {
   OnClick(button) {
     if (this.addNodeButton === button) {
       this.CreateNewNode();
+      this.Refresh();
       return;
     }
     let i;
