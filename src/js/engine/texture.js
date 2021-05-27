@@ -6,7 +6,6 @@ import { setFrameDirty } from './utils.js';
 import { Framebuffer } from './framebuffer.js';
 
 let maxTexUnitCount;
-const texBound = [];
 let texID = 0;
 
 const TextureParamType = Object.freeze(
@@ -44,21 +43,18 @@ class Texture {
 
   bind(unit = 0) {
     this.unit = unit;
-    if (texBound[unit] !== this.id) {
-      gl.activeTexture(gl.TEXTURE0 + unit);
-      gl.bindTexture(this.target, this.texture);
-      texBound[unit] = this.id;
-    }
+    if (unit > maxTexUnitCount) console.log(`meet maxTexUnitCount ${unit} > ${maxTexUnitCount}`);
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(this.target, this.texture);
     return this;
   }
 
   unbind(u) {
     let unit = u;
     if (!unit) unit = this.unit;
-    if (unit && texBound[unit] === this.id) {
+    if (unit) {
       gl.activeTexture(gl.TEXTURE0 + unit, null);
       gl.bindTexture(this.target, null);
-      texBound[unit] = null;
     }
     return this;
   }
@@ -142,16 +138,20 @@ class Texture2D extends Texture {
    * @param {GLenum} type texture type
    */
   constructor(
-    f, t, mipmap = true, width = 1, height = 1, pixels = undefined, options = undefined,
+    f, t,
+    width = 1,
+    height = 1,
+    pixels = undefined,
+    options = { Filter: TextureParamType.Mipmap },
   ) {
     super();
 
     const format = f || gl.RGBA;
     const type = t || gl.UNSIGNED_BYTE;
 
-    let pixel = pixels;
+    this.pixel = pixels;
     if (pixels === undefined && type === gl.UNSIGNED_BYTE) {
-      pixel = new Uint8Array([160, 60, 60, 255]);
+      this.pixel = new Uint8Array([160, 60, 60, 255]);
       setFrameDirty();
     }
     // level is mipmap level highest is 0
@@ -163,7 +163,6 @@ class Texture2D extends Texture {
     this.border = 0;
     this.srcType = type;
     this.target = gl.TEXTURE_2D;
-    this.mipmap = mipmap;
     this.width = width;
     this.height = height;
 
@@ -171,7 +170,7 @@ class Texture2D extends Texture {
     gl.bindTexture(this.target, this.texture);
 
     gl.texImage2D(this.target, this.level, this.internalFormat, this.width, this.height,
-      this.border, this.srcFormat, this.srcType, pixel);
+      this.border, this.srcFormat, this.srcType, this.pixel);
 
     if (options !== undefined) {
       if (options.Wrap !== undefined) {
@@ -332,17 +331,17 @@ let defaultTextures;
 function getDefaultTextures() {
   if (!defaultTextures) {
     defaultTextures = {
-      empty: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, false, 1, 1,
+      empty: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([0, 0, 0, 0])),
-      white: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, false, 1, 1,
+      white: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([255, 255, 255, 255])),
-      black: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, false, 1, 1,
+      black: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([0, 0, 0, 255])),
-      red: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, false, 1, 1,
+      red: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([255, 0, 0, 255])),
-      green: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, false, 1,
+      green: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1,
         new Uint8Array([0, 255, 0, 255])),
-      blue: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, false, 1, 1,
+      blue: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([0, 0, 255, 255])),
     };
   }

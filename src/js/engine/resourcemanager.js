@@ -1,4 +1,4 @@
-﻿import ReadFile from './readFile.js';
+﻿import { ReadFile } from './readFile.js';
 
 export default class ResourceManager {
   constructor() {

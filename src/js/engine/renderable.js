@@ -22,6 +22,7 @@ export default class Renderable {
     this.wireframeAttributeDatas = [];
     this.gameNode = null;
     this.drawingMode = DrawingMode.Normal;
+    this.ui = false;
   }
 
   drawErrorType(matrix, viewMat, projMat) {
@@ -124,6 +125,7 @@ export default class Renderable {
       }
 
       mat.setUniformDatas();
+      mat.onRender();
 
       this.setAttributesForShader(shader, this.buffer, this.attributeDatas);
     }

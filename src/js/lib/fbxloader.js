@@ -262,6 +262,8 @@ const fbxloader = {};
                 }
 
             }
+            // console.log(fbxTree);
+            // console.log(geometryMap);
 
             return geometryMap;
 
@@ -281,7 +283,7 @@ const fbxloader = {};
 
         // Parse single node mesh geometry in FBXTree.Objects.Geometry
         parseMeshGeometry: function (relationships, geoNode, deformers) {
-
+            // console.log(relationships);
             var morphTargets = [];
 
             var modelNodes = relationships.parents.map(function (parent) {
@@ -306,7 +308,7 @@ const fbxloader = {};
             // Assume one model and get the preRotation from that
             // if there is more than one model associated with the geometry this may cause problems
             var modelNode = modelNodes[0];
-            // console.oldLog(modelNode);
+            // console.log(modelNode);
 
             // var transformData = {};
 
@@ -319,6 +321,7 @@ const fbxloader = {};
 
             // var transform = generateTransform(transformData);
             var transform = {};
+            transform.name = modelNode.attrName;
             if ('Lcl_Rotation' in modelNode) transform.euler = modelNode.Lcl_Rotation.value;
             if ('Lcl_Scaling' in modelNode) transform.scale = modelNode.Lcl_Scaling.value;
             if ('Lcl_Translation' in modelNode) transform.position = modelNode.Lcl_Translation.value;
@@ -346,6 +349,20 @@ const fbxloader = {};
                 transform.pivot[2] -= modelNode.ScalingOffset.value[2];
             }
 
+            if ('position' in transform) {
+                transform.position[0] *= 0.01;
+                transform.position[1] *= 0.01;
+                transform.position[2] *= 0.01;
+            }
+
+            if ('scale' in transform) {
+                transform.scale[0] *= 0.01;
+                transform.scale[1] *= 0.01;
+                transform.scale[2] *= 0.01;
+            } else {
+                transform.scale = [0.01, 0.01, 0.01];
+            }
+
             return this.genGeometry(geoNode, morphTargets, transform);
 
         },
@@ -355,6 +372,7 @@ const fbxloader = {};
 
             // var geo = new THREE.BufferGeometry();
             // if (geoNode.attrName) geo.name = geoNode.attrName;
+            // console.log(geoNode);
 
             var geoInfo = this.parseGeoNode(geoNode);
 
@@ -365,11 +383,10 @@ const fbxloader = {};
                 }
             }
 
-            // console.oldLog(geoInfo);
+            // console.log(geoInfo);
 
             var buffers = this.genBuffers(geoInfo);
             buffers.meshVertices = geoInfo.vertexPositions;
-            buffers.meshFaces = geoInfo.vertexIndices;
             // console.log(preTransform);
             return {
                 buffers: buffers,

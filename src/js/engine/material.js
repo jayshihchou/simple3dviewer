@@ -4,21 +4,52 @@ import {
   vec2, vec3, vec4, mat2, mat3, mat4,
 } from '../lib/gl-matrix/index.js';
 import { gl } from './gl.js';
-import { logger } from './logger.js';
+import { GameNode } from './gamenode.js';
+
+const BlendType = Object.freeze(
+  {
+    NoBlend: 0,
+    Alpha: 1,
+    Add: 2,
+  },
+);
+
+function NoBlend() {
+  gl.disable(gl.BLEND);
+}
+
+function AlphaBlend() {
+  gl.enable(gl.BLEND);
+  gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE_MINUS_DST_ALPHA, gl.ONE);
+}
+
+function AddBlend() {
+  gl.enable(gl.BLEND);
+  gl.blendColor(1, 1, 1, 1);
+  gl.blendFunc(gl.ONE, gl.CONSTANT_COLOR);
+}
+
+// function SpriteBlend() {
+//   gl.enable(gl.BLEND);
+//   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+// }
+
+const blendFunctions = [NoBlend, AlphaBlend, AddBlend];
 
 export default class Material {
-  constructor(shaderName) {
-    this.parameters = [];
+  constructor(shaderName, blendType) {
+    this.parameters = {};
+    this.pkeys = [];
     this.ifdefines = [];
     this.defines = [];
     this.defineVals = [];
     this.additionalDefines = [];
     this.updateShader(shaderName);
+    this.blendType = blendType || BlendType.NoBlend;
+    this.blendFunction = blendFunctions[this.blendType];
   }
 
   get getShader() { return this.shader; }
-
-  get getParameterCount() { return this.parameters.length; }
 
   updateShader(shaderName = undefined) {
     if (shaderName) {
@@ -56,23 +87,30 @@ export default class Material {
 
   updateParameters() {
     let c;
-    let i;
+    // let i;
     let param;
+    let key;
+    let def;
     for (c = this.defines.length - 1; c >= 0; c -= 1) {
-      for (i = this.parameters.length - 1; i >= 0; i -= 1) {
-        param = this.parameters[i];
-        if (param && param.name === this.defines[c]) {
-          if (param.arrayVal !== this.defineVals[c]) {
-            param.data = undefined;
-            this.createParameter(i);
-          }
+      def = this.defines[c];
+      if (def in this.parameters) {
+        param = this.parameters[def];
+        if (param.arrayVal !== this.defineVals[c]) {
+          param.data = undefined;
+          this.createParameter(key);
         }
       }
+      // for (i = this.pkeys.length - 1; i >= 0; i -= 1) {
+      //   key = this.pkeys[i];
+      //   param = this.parameters[key];
+      //   if (param.name === this.defines[c]) {
+      //     if (param.arrayVal !== this.defineVals[c]) {
+      //       param.data = undefined;
+      //       this.createParameter(key);
+      //     }
+      //   }
+      // }
     }
-  }
-
-  getParameterAt(index) {
-    return this.parameters[index];
   }
 
   parseFromShader(shaderSrc) {
@@ -85,14 +123,19 @@ export default class Material {
   }
 
   getParameter(name) {
-    let c;
-    let param;
-    for (c = this.parameters.length - 1; c >= 0; c -= 1) {
-      param = this.parameters[c];
-      if (param && param.name === name) {
-        return param.data;
-      }
+    // let c;
+    // let param;
+    let key;
+    if (name in this.parameters) {
+      return this.parameters[key].data;
     }
+    // for (c = this.pkeys.length - 1; c >= 0; c -= 1) {
+    //   key = this.pkeys[c];
+    //   param = this.parameters[key];
+    //   if (param && param.name === name) {
+    //     return param.data;
+    //   }
+    // }
     return null;
   }
 
@@ -102,44 +145,66 @@ export default class Material {
    * @returns {boolean} true when data setted.
    */
   setUniformData(name, data) {
-    let c;
-    let param;
-    for (c = this.parameters.length - 1; c >= 0; c -= 1) {
-      param = this.parameters[c];
-      if (param && param.name === name) {
-        param.data = data;
-        param.expired = true;
-        return true;
-      }
+    // console.slog(name);
+    // console.log(this.parameters);
+    if (name in this.parameters) {
+      const param = this.parameters[name];
+      param.data = data;
+      param.expired = true;
+      return true;
     }
+    // let c;
+    // let param;
+    // let key;
+    // for (c = this.pkeys.length - 1; c >= 0; c -= 1) {
+    //   key = this.pkeys[c];
+    //   param = this.parameters[key];
+    //   if (param && param.name === name) {
+    //     param.data = data;
+    //     param.expired = true;
+    //     return true;
+    //   }
+    // }
 
     return false;
   }
 
   setUniformArrayData(name, index, data) {
-    let c;
-    let param;
-    for (c = this.parameters.length - 1; c >= 0; c -= 1) {
-      param = this.parameters[c];
-      if (param && param.array && param.name === name) {
-        if (!param.data) {
-          param = this.createParameter(c);
-        }
-        param.data[index] = data;
-        param.expired = true;
-        return true;
+    if (name in this.parameters) {
+      let param = this.parameters[name];
+      if (!param.data) {
+        param = this.createParameter(name);
       }
+      param.data[index] = data;
+      param.expired = true;
+      return true;
     }
+    // let c;
+    // let param;
+    // let key;
+    // for (c = this.pkeys.length - 1; c >= 0; c -= 1) {
+    //   key = this.pkeys[c];
+    //   param = this.parameters[key];
+    //   if (param && param.array && param.name === name) {
+    //     if (!param.data) {
+    //       param = this.createParameter(key);
+    //     }
+    //     param.data[index] = data;
+    //     param.expired = true;
+    //     return true;
+    //   }
+    // }
 
     return false;
   }
 
   hasKey(key) {
-    for (let c = this.parameters.length - 1; c >= 0; c -= 1) {
-      if (this.parameters[c].name === key) return true;
-    }
+    return key in this.parameters;
+    // for (let c = this.parameters.length - 1; c >= 0; c -= 1) {
+    //   if (this.parameters[c].name === key) return true;
+    // }
 
-    return false;
+    // return false;
   }
 
   hasDefine(key) {
@@ -162,9 +227,11 @@ export default class Material {
     for (let c = this.defines.length - 1; c >= 0; c -= 1) {
       if (this.defines[c] === key) {
         index = c;
+        break;
       }
     }
     if (index === -1) {
+      // console.log(`insert define ${key}: ${val}`);
       this.additionalDefines.push({ key, val });
       this.defines.push(key);
       this.defineVals.push(val);
@@ -175,14 +242,52 @@ export default class Material {
     this.updateShader();
   }
 
-  createParameter(index) {
-    const param = this.parameters[index];
+  removeDefine(key) {
+    for (let i = this.additionalDefines.length - 1; i >= 0; i -= 1) {
+      if (this.additionalDefines[i].key === key) {
+        this.additionalDefines.splice(i, 1);
+        break;
+      }
+    }
+    for (let c = this.defines.length - 1; c >= 0; c -= 1) {
+      if (this.defines[c] === key) {
+        this.defines.splice(c, 1);
+        this.defineVals.splice(c, 1);
+        break;
+      }
+    }
+    this.updateShader();
+  }
+
+  createParameter(key) {
+    const param = this.parameters[key];
     switch (param.type) {
       case 'sampler2D':
         if (!param.array) {
-          param.data = new Texture2D();
+          switch (param.name) {
+            case 'uNormal':
+              param.data = new Texture2D(
+                undefined, undefined, 1, 1, new Uint8Array([128, 127, 255, 255]),
+              );
+              break;
+            case 'uSpecular':
+              param.data = new Texture2D(
+                undefined, undefined, 1, 1, new Uint8Array([70, 70, 70, 255]),
+              );
+              break;
+            case 'uEnvir':
+              param.data = new Texture2D(
+                undefined, undefined, 1, 1, new Uint8Array([0, 0, 0, 255]),
+              );
+              break;
+            default:
+              param.data = new Texture2D();
+              break;
+          }
         } else {
-          param.data = [new Texture2D()];
+          param.data = [new Texture2D(
+            undefined, undefined, 1, 1, new Uint8Array([255, 255, 255, 255]),
+          )];
           param.texArr = new Int32Array(param.arrayVal);
         }
         break;
@@ -233,39 +338,29 @@ export default class Material {
   setUniformDatas() {
     let c;
     let max;
-    let i;
-    let imax;
     let param;
+    let key;
     let texunit = 0;
-    for (c = 0, max = this.parameters.length; c < max; c += 1) {
-      param = this.parameters[c];
+    // console.log(`=================== ${this.shaderName}`);
+    for (c = 0, max = this.pkeys.length; c < max; c += 1) {
+      key = this.pkeys[c];
+      param = this.parameters[key];
       if (!param.data) {
-        param = this.createParameter(c);
+        param = this.createParameter(key);
       }
       if (param.expired === undefined || param.expired) {
         param.expired = false;
         switch (param.type) {
           case 'sampler2D':
-            if (param.array) {
-              imax = param.data.length;
-              for (i = 0; i < imax; i += 1) {
-                param.data[i].bind(texunit);
-                param.texArr[i] = texunit;
-                texunit += 1;
-              }
-              this.shader.setIv(param.name, param.texArr);
-              for (i = 0; i < imax; i += 1) {
-                param.data[i].unbind();
-              }
-            } else {
-              param.data.bind(texunit);
-              this.shader.setInt(param.name, texunit);
-              texunit += 1;
-              param.data.unbind(texunit);
-            }
+            param.data.bind(texunit);
+            // console.log(param);
+            this.shader.setInt(param.name, texunit);
+            texunit += 1;
+            param.data.unbind(texunit);
             param.expired = true;
             break;
           case 'vec4':
+            // eslint-disable-next-line max-len
             this.shader.setVec4(param.name, param.data);
             break;
           case 'vec3':
@@ -301,10 +396,19 @@ export default class Material {
         if (err !== gl.NO_ERROR) {
           // eslint-disable-next-line no-console
           console.error(`error code : ${err}`);
-          logger.oldLog(param);
         }
       }
     }
+  }
+
+  setBlendType(blendType) {
+    this.blendType = blendType || BlendType.NoBlend;
+    this.blendFunction = blendFunctions[this.blendType];
+    GameNode.sortRenderingGroup();
+  }
+
+  onRender() {
+    this.blendFunction();
   }
 
   parseFromStr(text) {
@@ -400,9 +504,10 @@ export default class Material {
             }
             if (arg !== null) {
               if (type !== null) {
-                this.parameters.push({
+                this.pkeys.push(arg);
+                this.parameters[arg] = {
                   name: arg, type, array, arrayVal,
-                });
+                };
                 break;
               } else if (ifdef !== null) {
                 this.ifdefines.push(arg);
@@ -412,8 +517,8 @@ export default class Material {
         }
       }
     }
-    // console.oldLog(this.parameters);
+    // console.log(this.parameters);
   }
 }
 
-export { Material };
+export { Material, BlendType };

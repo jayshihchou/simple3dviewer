@@ -1,6 +1,6 @@
 ﻿/* eslint-disable no-console */
 import { gl } from './gl.js';
-import { isMobile } from './logger.js';
+import { isMobile } from './utils.js';
 
 let programUsing = null;
 
@@ -65,17 +65,13 @@ attribute vec3 position;
 attribute vec3 color;
 attribute vec3 normal;
 attribute vec2 texcoord;
-attribute vec3 tangent;
-attribute vec3 bitangent;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
-uniform mat3 normalMatrix;
 
 #pragma UNIFORMS
 
 varying highp vec2 vTexcoord;
-varying highp vec3 vColor;
 
 varying highp vec3 N;
 varying highp vec3 v;
@@ -84,30 +80,46 @@ void main(void)
   vec3 finalPos = position;
   gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
   vTexcoord = texcoord;
-  vColor = color;
   v = (viewMatrix * modelMatrix * vec4(finalPos, 1.0)).xyz;
-  N = normalize(normalMatrix * normal);
+  N = normalize(normal);
 }`,
-    fs: `uniform sampler2D uAlbedo;
+    fs: `precision mediump float;
+#pragma DEFINES
+#pragma UNIFORMS
+
+uniform sampler2D uAlbedo;
+
+#ifdef LIGHT_COUNT
+uniform vec3 lightDirections[LIGHT_COUNT];
+uniform vec3 lightColors[LIGHT_COUNT];
+#endif
+
 varying highp vec2 vTexcoord;
-varying highp vec3 vColor;
 varying highp vec3 N;
 varying highp vec3 v;
 void main(void)
 {
   highp vec4 col = texture2D(uAlbedo, vTexcoord);
-  // col.xyz += vColor;
-
+  highp vec4 Idiff = vec4(0.0, 0.0, 0.0, 1.0);
+  highp vec4 Ispec = vec4(0.0, 0.0, 0.0, 1.0);
+#ifdef LIGHT_COUNT
+  for(int i = 0; i < LIGHT_COUNT; i++) {
+    vec3 L = normalize(lightDirections[i] - v);
+    vec3 E = normalize(-v);
+    vec3 R = normalize(-reflect(L, N));
+    Idiff.rgb += lightColors[i] * max(dot(N,L), 0.0);
+    Ispec.rgb += lightColors[i] * pow(max(dot(R, E), 0.0), 30.0);
+  }
+#else
   highp vec3 L = normalize(vec3(0.0, 0.0, -1.0) - v);
   highp vec3 E = normalize(-v);
   highp vec3 R = normalize(-reflect(L, N));
-
+  Idiff = vec4(vec3(0.8, 0.8, 0.78).rgb, 1.0) * max(dot(N,L), 0.0);
+  Ispec = vec4(0.8, 0.8, 0.78, 1.0) * pow(max(dot(R, E), 0.0), 30.0);
+#endif
   highp vec4 Iamb = vec4(0.3, 0.3, 0.3, 1.0);
 
-  highp vec4 Idiff = vec4(0.8, 0.8, 0.78, 1.0) * max(dot(N,L), 0.0);
   Idiff = clamp(Idiff, 0.0, 1.0);
-
-  highp vec4 Ispec = vec4(0.8, 0.8, 0.78, 1.0) * pow(max(dot(R, E), 0.0), 30.0);
   Ispec = clamp(Ispec, 0.0, 1.0);
   gl_FragColor = col * (Iamb + Idiff + Ispec);
 }`,
@@ -118,8 +130,6 @@ attribute vec3 position;
 attribute vec3 color;
 attribute vec3 normal;
 attribute vec2 texcoord;
-attribute vec3 tangent;
-attribute vec3 bitangent;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
@@ -144,7 +154,12 @@ void main(void)
   highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
   vLighting = ambientLight + (directionalLightColor * directional);
 }`,
-    fs: `uniform sampler2D uAlbedo;
+    fs: `#pragma DEFINES
+
+uniform sampler2D uAlbedo;
+
+#pragma UNIFORMS
+
 varying highp vec2 vTexcoord;
 varying highp vec3 vLighting;
 void main(void)
@@ -173,7 +188,10 @@ void main(void)
   vTexcoord = texcoord;
   vColor = color;
 }`,
-    fs: `uniform sampler2D uAlbedo;
+    fs: `#pragma DEFINES
+precision highp float;
+uniform sampler2D uAlbedo;
+#pragma UNIFORMS
 varying highp vec2 vTexcoord;
 varying lowp vec4 vColor;
 void main(void)
@@ -287,7 +305,18 @@ uniform vec4 color;
 uniform vec3 lightDirections[LIGHT_COUNT];
 uniform vec3 lightColors[LIGHT_COUNT];
 uniform mat4 lightMatrices[LIGHT_COUNT];
-uniform sampler2D shadowmaps[LIGHT_COUNT];
+#if LIGHT_COUNT > 0
+uniform sampler2D shadowmap0;
+#if LIGHT_COUNT > 1
+uniform sampler2D shadowmap1;
+#if LIGHT_COUNT > 2
+uniform sampler2D shadowmap2;
+#if LIGHT_COUNT > 3
+uniform sampler2D shadowmap3;
+#endif
+#endif
+#endif
+#endif
 #endif
 
 vec3 kajiya_kay(vec3 diffuse, vec3 specular, float p, vec3 tangent, vec3 light, vec3 eye) {
@@ -326,13 +355,13 @@ vec4 tex2Dproj(sampler2D image, vec2 projected_position, vec2 displacement) {
 
 float approximate_deep_shadows(sampler2D shadow_map, vec4 light_space_strand, float kernel_width, float smoothing, float strand_radius, float strand_opacity) {
   float visibility = 0.0;
-  vec2 shadow_map_size = vec2(1024.0, 1024.0);
+  vec2 shadow_map_size = vec2(1536.0, 1536.0);
 
   // float kernel_range = (kernel_width - 1.0) / 2.0;
   float sigma_stddev = (kernel_width / 2.0) / 2.4;
   float sigma_squared = sigma_stddev * sigma_stddev;
 
-  float light_depth = light_space_strand.z / light_space_strand.w;
+  float light_depth = (light_space_strand.z / light_space_strand.w) * 0.5 + 0.5;
   vec2 shadow_map_stride = shadow_map_size / smoothing; // stride.
 
   vec2 projected_position = (light_space_strand.xy / light_space_strand.w) * 0.5 + 0.5;
@@ -380,11 +409,28 @@ void main(void)
   // TODO : add occlusion and shadow
   float occlusion = 1.0;
 #ifdef LIGHT_COUNT
-  for (int i = 0; i < LIGHT_COUNT; i++) {
-      vec4 shadow_space_fragment = lightMatrices[i] * worldPosition;
-      //float approximate_deep_shadows(sampler2D shadow_map, vec4 light_space_strand, float kernel_width, float smoothing, float strand_radius, float strand_opacity)
-      occlusion *= approximate_deep_shadows(shadowmaps[i], shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
-    }
+  // since no array
+  // for (int i = 0; i < LIGHT_COUNT; i++) {
+  //     vec4 shadow_space_fragment = lightMatrices[i] * worldPosition;
+  //     //float approximate_deep_shadows(sampler2D shadow_map, vec4 light_space_strand, float kernel_width, float smoothing, float strand_radius, float strand_opacity)
+  //     occlusion *= approximate_deep_shadows(shadowmaps[i], shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  //   }
+  #if LIGHT_COUNT > 0
+  vec4 shadow_space_fragment = lightMatrices[0] * vec4(vWorldPos, 1.0);
+  occlusion *= approximate_deep_shadows(shadowmap0, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  #if LIGHT_COUNT > 1
+  shadow_space_fragment = lightMatrices[1] * vec4(vWorldPos, 1.0);
+  occlusion *= approximate_deep_shadows(shadowmap1, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  #if LIGHT_COUNT > 2
+  shadow_space_fragment = lightMatrices[2] * vec4(vWorldPos, 1.0);
+  occlusion *= approximate_deep_shadows(shadowmap2, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  #if LIGHT_COUNT > 3
+  shadow_space_fragment = lightMatrices[3] * vec4(vWorldPos, 1.0);
+  occlusion *= approximate_deep_shadows(shadowmap3, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  #endif
+  #endif
+  #endif
+  #endif
 #endif
   lowp vec3 shading = vec3(1.0, 1.0, 1.0);
 #ifdef LIGHT_COUNT
@@ -430,9 +476,12 @@ void main(void)
   },
 };
 
-for (let i = shadersMap.length - 1; i >= 0; i -= 1) {
-  shadersMap[i].vs = removeShaderText(shadersMap[i].vs);
-  shadersMap[i].fs = removeShaderText(shadersMap[i].fs);
+const keys = Object.keys(shadersMap);
+for (let i = keys.length - 1; i >= 0; i -= 1) {
+  const k = keys[i];
+  shadersMap[k].name = k;
+  shadersMap[k].vs = removeShaderText(shadersMap[k].vs);
+  shadersMap[k].fs = removeShaderText(shadersMap[k].fs);
 }
 
 function loadShader(type, name, s) {
@@ -534,11 +583,15 @@ export default class Shader {
     return location;
   }
 
-  setInt(name, value) {
+  setInt(name, value, debug = false) {
     if (this.value_cache[name] !== value) {
       this.value_cache[name] = value;
       const uniLoc = this.getUniformLocation(name);
       if (uniLoc) gl.uniform1i(uniLoc, value);
+      else console.log(`setInt failed for ${name}`);
+    }
+    if (debug) {
+      console.log(`setInt for ${name} : ${value}`);
     }
     return this;
   }
@@ -567,39 +620,42 @@ export default class Shader {
   setVal2(name, x, y) {
     const cached = this.value_cache[name];
     if (cached) {
-      if (cached.x !== x || cached.y !== y) {
-        cached.x = x;
-        cached.y = y;
+      if (cached[0] !== x || cached[1] !== y) {
+        cached[0] = x;
+        cached[1] = y;
         this.value_cache[name] = cached;
       } else return this;
     } else {
-      this.value_cache[name] = { x, y };
+      this.value_cache[name] = [x, y];
     }
     const uniLoc = this.getUniformLocation(name);
     if (uniLoc) gl.uniform2f(uniLoc, x, y);
+    // else console.log(`Cannot find uniLoc for name: ${name}`);
     return this;
   }
 
   setVal3(name, x, y, z) {
     const cached = this.value_cache[name];
     if (cached) {
-      if (cached.x !== x || cached.y !== y || cached.z !== z) {
-        cached.x = x;
-        cached.y = y;
-        cached.z = z;
+      if (cached[0] !== x || cached[1] !== y || cached[2] !== z) {
+        cached[0] = x;
+        cached[1] = y;
+        cached[2] = z;
         this.value_cache[name] = cached;
       } else return this;
     } else {
-      this.value_cache[name] = { x, y, z };
+      this.value_cache[name] = [x, y, z];
     }
     const uniLoc = this.getUniformLocation(name);
     if (uniLoc) gl.uniform3f(uniLoc, x, y, z);
+    // else console.log(`Cannot find uniLoc for name: ${name}`);
     return this;
   }
 
   setVal4(name, x, y, z, w) {
     const uniLoc = this.getUniformLocation(name);
     if (uniLoc) gl.uniform4f(uniLoc, x, y, z, w);
+    // else console.log(`Cannot find uniLoc for name: ${name}`);
     return this;
   }
 
@@ -612,7 +668,7 @@ export default class Shader {
   setVec3(name, vec) {
     const uniLoc = this.getUniformLocation(name);
     if (uniLoc) gl.uniform3fv(uniLoc, vec);
-    else console.log(`Cannot find uniLoc for name: ${name}`);
+    // else console.log(`Cannot find uniLoc for name: ${name}`);
     return this;
   }
 

@@ -29,6 +29,7 @@ export default class Camera {
     this.clearColor = true;
     this.backgroundColor = [0.2, 0.3, 0.4, 1.0];
     this.clearDepth = true;
+    this.fixedSize = false;
 
     this.viewport = [0.0, 0.0, 1.0, 1.0];
 
@@ -71,17 +72,23 @@ export default class Camera {
 
   get orthoSize() { return this.orthoTagSize; }
 
-  set orthoSize(orthoSize) { this.orthoTagSize = orthoSize; }
+  set orthoSize(orthoSize) {
+    this.orthoTagSize = orthoSize;
+    this.updateProjectionMatrix();
+  }
 
   get resolution() {
     return vec2.set(vec2.create(), this.width, this.height);
   }
 
   onResize(width, height) {
-    this.width = width;
-    this.height = height;
-    this.aspect = width / height;
+    if (!this.fixedSize) {
+      this.width = width;
+      this.height = height;
+    }
+    this.aspect = this.width / this.height;
     this.updateProjectionMatrix();
+    return this;
   }
 
   updateProjectionMatrix() {
@@ -115,56 +122,60 @@ export default class Camera {
     const viewMat = this.transform.inverseMatrix;
     const projMat = this.projectionMatrix;
 
-    if (this.uiTag) {
-      gl.disable(gl.DEPTH_TEST);
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-      gl.enable(gl.CULL_FACE);
-      gl.cullFace(gl.BACK);
-      // gl.disable(gl.CULL_FACE);
-      // ed rendering
-      // var err;
-      // err = gl.getError();
-      // if (err !== gl.NO_ERROR) {
-      //     console.error("UI1 error gl error code : " + err);
-      // }
-      for (let c = nodeGroup.length - 1; c >= 0; c -= 1) {
-        if (nodeGroup[c] && nodeGroup[c].ui) {
-          nodeGroup[c].render(this, Light, viewMat, projMat);
-        }
+    if (this.clearColor) gl.clearColor(this.backgroundColor[0], this.backgroundColor[1], this.backgroundColor[2], this.backgroundColor[3]);
+    if (this.clearDepth) gl.clearDepth(1.0);
+
+    if (this.clearColor || this.clearDepth) {
+      if (this.clearColor && this.clearDepth) {
+        // eslint-disable-next-line no-bitwise
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      } else if (!this.clearColor) {
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+      } else if (!this.clearDepth) {
+        gl.clear(gl.COLOR_BUFFER_BIT);
       }
-
-      gl.disable(gl.BLEND);
-      gl.enable(gl.DEPTH_TEST);
-    } else {
-      if (this.clearColor) gl.clearColor(this.backgroundColor[0], this.backgroundColor[1], this.backgroundColor[2], this.backgroundColor[3]);
-      if (this.clearDepth) gl.clearDepth(1.0);
-
-      if (this.clearColor || this.clearDepth) {
-        if (this.clearColor && this.clearDepth) {
-          // eslint-disable-next-line no-bitwise
-          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        } else if (!this.clearColor) {
-          gl.clear(gl.DEPTH_BUFFER_BIT);
-        } else if (!this.clearDepth) {
-          gl.clear(gl.COLOR_BUFFER_BIT);
-        }
-      }
-
-      gl.enable(gl.DEPTH_TEST);
-      gl.depthFunc(gl.LEQUAL);
-
-      gl.enable(gl.CULL_FACE);
-      gl.cullFace(gl.BACK);
-
-      for (let c = nodeGroup.length - 1; c >= 0; c -= 1) {
-        if (nodeGroup[c] && !nodeGroup[c].ui) {
-          nodeGroup[c].render(this, Light, viewMat, projMat, material);
-        }
-      }
-
-      if (drawDebugDraw) DebugDraw.get()?.draw(viewMat, projMat);
     }
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+    // gl.disable(gl.CULL_FACE);
+    nodeGroup.forEach((node) => {
+      if (!node.ui) node.render(this, Light, viewMat, projMat, material);
+    });
+
+    if (drawDebugDraw) DebugDraw.get()?.draw(viewMat, projMat);
+    return this;
+  }
+
+  render2D(nodeGroup, Light = undefined) {
+    if (!this.enabled) return this;
+    if (this.viewport[0] !== 0.0 || this.viewport[1] !== 0.0 || this.viewport[2] !== 1.0 || this.viewport[3] !== 1.0) {
+      gl.viewport(this.viewport[0], this.viewport[1], this.viewport[2], this.viewport[3]);
+    }
+    const viewMat = this.transform.inverseMatrix;
+    const projMat = this.projectionMatrix;
+
+    gl.disable(gl.DEPTH_TEST);
+    // gl.enable(gl.BLEND);
+    // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+    // gl.disable(gl.CULL_FACE);
+    // ed rendering
+    // var err;
+    // err = gl.getError();
+    // if (err !== gl.NO_ERROR) {
+    //     console.error("UI1 error gl error code : " + err);
+    // }
+    nodeGroup.forEach((node) => {
+      if (node.ui) node.render(this, Light, viewMat, projMat);
+    });
+
+    // gl.disable(gl.BLEND);
+    gl.enable(gl.DEPTH_TEST);
     return this;
   }
 }

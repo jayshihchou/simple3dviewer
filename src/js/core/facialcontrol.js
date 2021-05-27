@@ -1,17 +1,17 @@
-import { isMobile } from '../engine/logger.js';
 import { GameNode } from '../engine/gamenode.js';
 import { Rect } from '../engine/UI/rect.js';
 import { Button } from '../engine/UI/button.js';
 import { Slider } from '../engine/UI/slider.js';
 import { Text } from '../engine/UI/text.js';
 import { Joystick } from '../engine/UI/joystick.js';
-import { clamp } from '../engine/utils.js';
+import { clamp, isMobile } from '../engine/utils.js';
 import { SetControlEnabled } from './blendshapeControl.js';
 import { addOnStart } from './app.js';
+import { input } from '../engine/inputmanager.js';
 
 export default class FacialControl {
   constructor(app) {
-    app.addOnLoadMesh(this.CheckIsFacial, this);
+    app.addEvent('OnLoadMesh', this.CheckIsFacial, this);
     this.AUmap = [
       { name: 'AU1', items: ['browInnerUp_L', 'browInnerUp_R'] },
       { name: 'AU2', items: ['browOuterUp_L', 'browOuterUp_R'] },
@@ -36,9 +36,13 @@ export default class FacialControl {
       { name: 'AU30R', items: ['jawRight'] },
       { name: 'AU33', items: ['cheekPuff_L', 'cheekPuff_R'] },
     ];
+    input.eventListeners.push(this);
   }
 
-  CheckIsFacial(mesh) {
+  CheckIsFacial(nodes) {
+    this.mesh = undefined;
+    if (!nodes[0]) return;
+    const mesh = nodes[0].renderable;
     if (!mesh || mesh.blendShapeSize <= 0) {
       return;
     }
@@ -56,7 +60,8 @@ export default class FacialControl {
     if (contains) {
       this.init(mesh);
     }
-    if (this.mesh) this.setEnabled(contains);
+    if (isMobile) this.setEnable(contains);
+    else this.setEnable(false);
   }
 
   init(mesh) {
@@ -232,12 +237,13 @@ export default class FacialControl {
         'mouthFrown_R',
       ]);
     }
+
     this.cachedValues = [];
     this.onPage();
   }
 
-  setEnabled(yes) {
-    if (this.enabled !== yes) {
+  setEnable(yes) {
+    if (this.mesh && this.enabled !== yes) {
       this.enabled = yes;
       this.stateButton.enabled = this.enabled;
       this.leftButton.enabled = this.enabled;
@@ -501,6 +507,12 @@ export default class FacialControl {
       this.mesh.SetBlendWeight(this.mesh.BlendShapeNameToIndex('mouthSmile_R'), clamp(y - clamp(x, 0, 1), 0, 1));
       this.mesh.SetBlendWeight(this.mesh.BlendShapeNameToIndex('mouthFrown_L'), clamp(-y - clamp(-x, 0, 1), 0, 1));
       this.mesh.SetBlendWeight(this.mesh.BlendShapeNameToIndex('mouthFrown_R'), clamp(-y - clamp(x, 0, 1), 0, 1));
+    }
+  }
+
+  OnKeyDown(e) {
+    if (e.key === 'b') {
+      this.setEnable(!this.enabled);
     }
   }
 }

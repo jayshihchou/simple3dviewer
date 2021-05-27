@@ -31,7 +31,7 @@ export default class RenderTexture {
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
     const option = { Wrap: TextureParamType.Clamp_To_Edge, Filter: TextureParamType.Nearest };
-    this.texture = new Texture2D(texFormat, texType, false, this.width, this.height, null, option);
+    this.texture = new Texture2D(texFormat, texType, this.width, this.height, null, option);
 
     switch (this.type) {
       case RenderTextureType.Depth:

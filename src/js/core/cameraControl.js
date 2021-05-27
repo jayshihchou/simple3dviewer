@@ -1,12 +1,12 @@
 import { input } from '../engine/inputmanager.js';
-import { setFrameDirty, clamp } from '../engine/utils.js';
+import { setFrameDirty, clamp, isMobile } from '../engine/utils.js';
 import { vec3 } from '../lib/gl-matrix/index.js';
-import { isMobile } from '../engine/logger.js';
 import { Rect } from '../engine/UI/rect.js';
 import { Button } from '../engine/UI/button.js';
 import { DebugDraw } from '../engine/debugDraw.js';
 import { timer } from '../engine/timer.js';
 import { addOnStart } from './app.js';
+// import Slider from '../engine/UI/slider.js';
 
 export default class CameraControl {
   constructor(app) {
@@ -39,23 +39,22 @@ export default class CameraControl {
       this.button1.notify.push(this);
       this.button1.enabled = false;
     }
-    app.addOnLoadMesh(this.setScale, this);
+    app.addEvent('OnLoadMesh', this.setScale, this);
   }
 
   OnClick(button) {
     if (this.button1 === button) {
-      setFrameDirty();
       this.look_at_target_offset = vec3.create();
       this.distance_to_object = this.target_dist;
       const pos = vec3.scale(vec3.create(), this.camera.transform.forward, this.distance_to_object);
       vec3.add(pos, pos, this.look_at_target);
       vec3.add(this.camera.transform.position, pos, this.look_at_target_offset);
       this.button1.enabled = false;
+      DebugDraw.get()?.clear();
     }
   }
 
   OnTouchStart(e) {
-    setFrameDirty();
     this.lastTouchDistSqr = undefined;
 
     if (e.type === 4) {
@@ -69,9 +68,9 @@ export default class CameraControl {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  OnTouchEnd() {
-    DebugDraw.get()?.clear();
-  }
+  // OnTouchEnd() {
+  //   DebugDraw.get()?.clear();
+  // }
 
   update(dt) {
     if (this.distance_to_object !== this.target_dist) {
@@ -87,7 +86,7 @@ export default class CameraControl {
   }
 
   OnMouseWheel(d) {
-    setFrameDirty();
+    if (input.lockTarget) return;
     let delta = d;
     if (delta === undefined || Number.isNaN(delta)) delta = 0;
     else delta = clamp(delta, -1.0, 1.0);
@@ -97,8 +96,8 @@ export default class CameraControl {
   }
 
   OnTouch(e) {
-    setFrameDirty();
     if (input.anyObjectTouched) return;
+    if (input.lockTarget) return;
 
     if (e.x2 !== undefined && e.y2 !== undefined) {
       // two finger
@@ -138,41 +137,61 @@ export default class CameraControl {
     vec3.add(this.camera.transform.position, pos, this.look_at_target_offset);
   }
 
-  setScale() {
-    setFrameDirty();
-    if (!this.node) return;
-    // console.log(this.node.renderable.aabb);
-    const min = this.node.renderable.aabb[0];
-    const max = this.node.renderable.aabb[1];
-    // console.log(this.node.transform);
-    vec3.add(min, min, this.node.transform.position);
-    vec3.add(max, max, this.node.transform.position);
-    vec3.multiply(min, min, this.node.transform.scale);
-    vec3.multiply(max, max, this.node.transform.scale);
+  setScale(nodes) {
+    if (!nodes) return;
+    // console.log(nodes);
+    const allMax = [Number.MIN_VALUE, Number.MIN_VALUE, Number.MIN_VALUE];
+    const allMin = [Number.MAX_VALUE, Number.MAX_VALUE, Number.MAX_VALUE];
+    // console.log(`min : ${allMin}, max : ${allMax}`);
+    nodes.forEach((node) => {
+      // console.log(node.renderable.aabb);
+      let min = node.renderable.aabb[0];
+      let max = node.renderable.aabb[1];
+
+      // console.log(node.transform);
+      min = vec3.multiply(vec3.create(), min, node.transform.scale);
+      max = vec3.multiply(vec3.create(), max, node.transform.scale);
+      vec3.add(min, min, node.transform.position);
+      vec3.add(max, max, node.transform.position);
+
+      vec3.min(allMin, allMin, min);
+      vec3.max(allMax, allMax, max);
+      // console.log(`min: ${min}, max: ${max}, allMin: ${allMin}, allMax: ${allMax}`);
+    });
 
     this.look_at_target = vec3.set(
       vec3.create(),
-      (min[0] + max[0]) * 0.5,
-      (min[1] + max[1]) * 0.5,
-      (min[2] + max[2]) * 0.5,
+      (allMin[0] + allMax[0]) * 0.5,
+      (allMin[1] + allMax[1]) * 0.5,
+      (allMin[2] + allMax[2]) * 0.5,
     );
 
-    // console.log(`min: ${min}, max: ${max}, look_at: ${this.look_at_target}`);
-    const dist = vec3.distance(min, max);
+    // console.log(`min: ${allMin}, max: ${allMax}, look_at: ${this.look_at_target}`);
+    const dist = vec3.distance(allMin, allMax);
     // console.log(`dist: ${dist}`);
     this.scale_min = 0.2 * dist;
-    this.scale_max = 2 * dist;
+    this.scale_max = 3.0 * dist;
     this.scale_speed = clamp(dist * 0.1, 0.000001, 1000000.0);
     this.scale_update_speed = this.scale_speed * 20.0;
     // console.log(this.scale_update_speed);
     this.target_dist = dist;
     this.move_speed = dist * 0.001;
     this.distance_to_object = this.target_dist - 0.01;
-    if (this.camera.zFar < dist) {
-      this.camera.zFar = dist * 2.0;
+    // console.log(this.camera);
+    // console.log(`far: ${dist * 5.0}`);
+    if (this.camera.zFar < dist * 5.0) {
+      this.camera.zFar = dist * 5.0;
       // console.log(`zFar: ${this.camera.zFar}`);
-      this.camera.updateProjectionMatrix();
     }
+
+    const close = clamp(Math.min(Math.min(allMin[0], allMin[1]), allMin[2]), 1e-4, 1.0) * 0.5;
+    // console.log(`close: ${close}`);
+    if (this.camera.zNear > close) {
+      this.camera.zNear = close;
+      // console.log(`zFar: ${this.camera.zNear}`);
+    }
+
+    this.camera.updateProjectionMatrix();
   }
 }
 

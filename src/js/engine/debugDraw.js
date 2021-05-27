@@ -31,26 +31,26 @@ export default class DebugDraw extends Renderable {
     return debugDraw;
   }
 
-  addOrigLine(point, matrix = undefined) {
+  addOrigLine(point, matrix = undefined, length = 2.0) {
     let forward = point.slice();
     if (matrix) {
-      forward = vec3.add(vec3.create(), forward, mat4MulVec3(matrix, [2.0, 0.0, 0.0]));
+      forward = vec3.add(vec3.create(), forward, mat4MulVec3(matrix, [length, 0.0, 0.0]));
     } else {
-      forward[0] += 2.0;
+      forward[0] += length;
     }
     this.addLine(point, forward, [1.0, 0.0, 0.0, 1.0]);
     forward = point.slice();
     if (matrix) {
-      forward = vec3.add(vec3.create(), forward, mat4MulVec3(matrix, [0.0, 2.0, 0.0]));
+      forward = vec3.add(vec3.create(), forward, mat4MulVec3(matrix, [0.0, length, 0.0]));
     } else {
-      forward[1] += 2.0;
+      forward[1] += length;
     }
     this.addLine(point, forward, [0.0, 1.0, 0.0, 1.0]);
     forward = point.slice();
     if (matrix) {
-      forward = vec3.add(vec3.create(), forward, mat4MulVec3(matrix, [0.0, 0.0, -3.0]));
+      forward = vec3.add(vec3.create(), forward, mat4MulVec3(matrix, [0.0, 0.0, -length * 1.5]));
     } else {
-      forward[2] += 3.0;
+      forward[2] += length * 1.5;
     }
     this.addLine(point, forward, [0.0, 0.0, 1.0, 1.0]);
   }
@@ -59,6 +59,17 @@ export default class DebugDraw extends Renderable {
     this.datas.push(
       {
         line: [fromPnt[0], fromPnt[1], fromPnt[2], toPnt[0], toPnt[1], toPnt[2]],
+        width,
+        color,
+      },
+    );
+  }
+
+  addLines(lines, size, color = undefined, width = 1.0) {
+    this.datas.push(
+      {
+        line: lines,
+        size,
         width,
         color,
       },
@@ -78,10 +89,11 @@ export default class DebugDraw extends Renderable {
 
         this.buildLine(data.line);
 
-        this.drawCurrentLine(viewMat, projMat, data.color, data.width);
+        this.drawCurrentLine(viewMat, projMat, data.color, data.width, data.size);
       }
     }
     if (this.clearFrame) {
+      this.clearFrame = false;
       this.datas.length = 0;
     }
     return this;
@@ -92,7 +104,7 @@ export default class DebugDraw extends Renderable {
     return this;
   }
 
-  drawCurrentLine(viewMat, projMat, color, width) {
+  drawCurrentLine(viewMat, projMat, color, width, size) {
     this.shader.bind();
     this.shader.setMatrix4('viewMatrix', viewMat);
     this.shader.setMatrix4('projectionMatrix', projMat);
@@ -104,7 +116,7 @@ export default class DebugDraw extends Renderable {
 
     gl.lineWidth(width);
 
-    gl.drawArrays(this.mode, this.first, this.size);
+    gl.drawArrays(this.mode, this.first, !size ? this.size : size);
 
     this.disableAttribs(this.shader, this.attributeDatas);
 

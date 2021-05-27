@@ -39,9 +39,8 @@ function onMouseDown(event) {
   if (input.eventListeners.length > 0) {
     for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
       if (input.eventListeners[i].OnTouchStart !== undefined) {
-        if (input.eventListeners[i].OnTouchStart(touchEvent)) {
-          input.anyObjectTouched = true;
-        }
+        input.anyObjectTouched = input.eventListeners[i].OnTouchStart(touchEvent);
+        if (input.anyObjectTouched) break;
       }
     }
   }
@@ -190,13 +189,50 @@ function onDragFile(e) {
   input.anyObjectTouched = false;
   e.preventDefault();
   e.stopPropagation();
+  // console.log(e);
 
   const dt = e.dataTransfer;
   const { files } = dt;
+  const { x, y } = e;
+  const pos = [x, screenSize[1] - y];
 
   if (files.length > 0) {
     if (input.onFilesEnter !== undefined) {
-      input.onFilesEnter(files);
+      input.onFilesEnter(files, pos);
+    }
+  }
+}
+
+function onKeyDown(e) {
+  setFrameDirty();
+  if (input.eventListeners.length > 0) {
+    for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
+      if (input.eventListeners[i].OnKeyDown) {
+        input.eventListeners[i].OnKeyDown(e);
+      }
+    }
+  }
+}
+
+function onKeyUp(e) {
+  setFrameDirty();
+  // console.log(`keyup ${e.key}`);
+  if (input.eventListeners.length > 0) {
+    for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
+      if (input.eventListeners[i].OnKeyUp) {
+        input.eventListeners[i].OnKeyUp(e);
+      }
+    }
+  }
+}
+
+function onKeyPress(e) {
+  setFrameDirty();
+  if (input.eventListeners.length > 0) {
+    for (let i = input.eventListeners.length - 1; i >= 0; i -= 1) {
+      if (input.eventListeners[i].OnKeyPress) {
+        input.eventListeners[i].OnKeyPress(e);
+      }
     }
   }
 }
@@ -228,6 +264,10 @@ class InputManager {
 
     this.container.addEventListener('dblclick', preventDefaultEvents, false);
 
+    document.addEventListener('keydown', onKeyDown, false);
+    document.addEventListener('keyup', onKeyUp, false);
+    document.addEventListener('keypress', onKeyPress, false);
+
     this.container.onmousedown = onMouseDown;
     this.container.onmouseup = onMouseUp;
     this.container.onmousemove = onMouseMove;
@@ -243,6 +283,7 @@ class InputManager {
 
     this.onFilesEnter = undefined;
 
+    this.lockTarget = undefined;
     this.anyObjectTouched = false;
     this.anyObjectTouchedOut = false;
     this.eventListeners = [];

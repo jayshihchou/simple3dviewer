@@ -20,7 +20,6 @@ import { ReadFile } from '../engine/readFile.js';
 import { resourceManager } from '../engine/resourcemanager.js';
 
 let app = null;
-const onloadDefault = [];
 const onStarts = [];
 
 let cubeText = `
@@ -36,24 +35,18 @@ vt 0.000000 0.000000
 vt 1.000000 0.000000
 vt 0.000000 1.000000
 vt 1.000000 1.000000
-vn 0.000000 0.000000 1.000000
-vn 0.000000 1.000000 0.000000
-vn 0.000000 0.000000 -1.000000
-vn 0.000000 -1.000000 0.000000
-vn 1.000000 0.000000 0.000000
-vn -1.000000 0.000000 0.000000
-f 1/1/1 2/2/1 3/3/1
-f 3/3/1 2/2/1 4/4/1
-f 3/1/2 4/2/2 5/3/2
-f 5/3/2 4/2/2 6/4/2
-f 5/4/3 6/3/3 7/2/3
-f 7/2/3 6/3/3 8/1/3
-f 7/1/4 8/2/4 1/3/4
-f 1/3/4 8/2/4 2/4/4
-f 2/1/5 8/2/5 4/3/5
-f 4/3/5 8/2/5 6/4/5
-f 7/1/6 1/2/6 5/3/6
-f 5/3/6 1/2/6 3/4/6`;
+f 1/1/ 2/2/ 3/3/
+f 3/3/ 2/2/ 4/4/
+f 3/1/ 4/2/ 5/3/
+f 5/3/ 4/2/ 6/4/
+f 5/4/ 6/3/ 7/2/
+f 7/2/ 6/3/ 8/1/
+f 7/1/ 8/2/ 1/3/
+f 1/3/ 8/2/ 2/4/
+f 2/1/ 8/2/ 4/3/
+f 4/3/ 8/2/ 6/4/
+f 7/1/ 1/2/ 5/3/
+f 5/3/ 1/2/ 3/4/`;
 cubeText = cubeText
   .replace(/\sf+/g, '\nf')
   .replace(/\svn+/g, '\nvn')
@@ -111,27 +104,24 @@ function resizeToMatchDisplaySize(canvas) {
   return false;
 }
 
-function onFilesEnter(files) {
+function onFilesEnter(files, p) {
   const self = app;
+  const pos = p;
+  const nls = [[undefined], pos];
+  self.triggerEvent('PosToNode', nls);
+  const [[node]] = nls;
+
   for (let i = 0, max = files.length; i < max; i += 1) {
     const f = files[i];
     if (f) {
+      const filelower = f.name.toLowerCase();
       const filenamelist = f.name.split('.');
       const ext = filenamelist[filenamelist.length - 1].toLowerCase();
-      if (ext === 'obj') {
-        const reader = new FileReader();
-        reader.onloadend = (function onloadend(r) {
-          return function afterload() {
-            self.loadObj(r.result);
-          };
-        }(reader));
-        reader.readAsText(f);
-      } else if (ext === 'png' || ext === 'jpg') {
+      if (ext === 'png' || ext === 'jpg') {
         const reader = new FileReader();
         reader.addEventListener('load', function loadtexture() {
           const tex = new Texture2D();
           const url = this.result;
-          const filelower = f.name.toLowerCase();
           let uniforName = 'uAlbedo';
           if (filelower.includes('normal')) {
             uniforName = 'uNormal';
@@ -145,21 +135,33 @@ function onFilesEnter(files) {
             uniforName = 'uEnvir';
           }
           tex.loadFromUrl(url, () => {
-            // console.log(`set ${uniforName} for ${f.name}`);
-            self.node.renderable.material.setUniformData(uniforName, tex);
+            if (node.renderable.material.setUniformData(uniforName, tex, true)) {
+              // console.log(`set ${uniforName} for ${f.name}`);
+              // console.log(node);
+              // console.log(tex);
+              // console.log(node.renderable.material);
+            }
           });
         }, false);
         reader.readAsDataURL(f);
+      } else if (ext === 'obj') {
+        const reader = new FileReader();
+        reader.onloadend = (function onloadend(r) {
+          return () => {
+            self.loadObj(r.result, node);
+          };
+        }(reader));
+        reader.readAsText(f);
       } else if (ext === 'fbx') {
         const reader = new FileReader();
-        reader.addEventListener('load', function loadfbx() {
-          self.loadFBX(this.result);
+        reader.addEventListener('load', () => {
+          self.loadFBX(reader.result, undefined, node);
         }, false);
         reader.readAsDataURL(f);
       } else if (ext === 'hair') {
         const reader = new FileReader();
-        reader.addEventListener('load', function loadfbx() {
-          self.loadHair(this.result);
+        reader.addEventListener('load', () => {
+          self.loadHair(reader.result, undefined, node);
         }, false);
         reader.readAsDataURL(f);
       }
@@ -194,53 +196,67 @@ export default class Application {
     this.camera.transform.position = [0.0, 0.0, 0.0];
     this.camera.clearColor = true;
     this.camera.clearDepth = false;
+    // this.camera.backgroundColor = [0.014, 0.014, 0.014];
 
     // camera
     this.camera2D = new Camera(gl.canvas.clientWidth, gl.canvas.clientHeight);
     this.camera2D.ui = true;
     this.camera2D.transform.position = [0.0, 0.0, 0.0];
 
-    this.node = new GameNode(new Mesh(
-      'default_orig',
-      cubeText,
-    ), 'main_mesh');
+    this.events = {};
 
-    this.other_nodes = [];
+    this.node = new GameNode(new Mesh(
+      'default',
+      cubeText,
+    ), 'main_node', true);
+    this.node.transform.scale = [0.1, 0.1, 0.1];
+    this.nodeCount = 1;
+
+    this.nodes = [this.node];
 
     this.nodeGroup = GameNode.getGroup();
 
     this.onLoadMesh = [];
 
     this.mainLight = new Light();
-    this.mainLight.transform.euler = [-30.0, 135.0, 0.0];
+    this.mainLight.transform.euler = [-15.0, -30.0, 0.0];
     this.mainLight.transform.position = vec3.scale(
       vec3.create(), this.mainLight.transform.forward, 3.0,
     );
-    this.mainLight.color = [0.4, 0.38, 0.28];
-    // this.addOnLoadMesh(() => {
-    //   const self = app;
-    //   const min = self.node.renderable.aabb[0];
-    //   const max = self.node.renderable.aabb[1];
-    //   let center = vec3.add(vec3.create(), min, max);
-    //   center = vec3.scale(center, center, 0.5);
-    //   const dist = vec3.distance(min, max);
-    //   // console.log(`${this.mainLight.camera.zNear} to ${this.mainLight.camera.zFar}`);
-    //   self.mainLight.transform.position = vec3.scaleAndAdd(
-    //     vec3.create(), center, self.mainLight.transform.forward, dist * 0.5,
-    //   );
-    // });
+    // this.mainLight.transform.position = [0.5292444229125977, -0.0104089947, -0.848405599594];
+    // console.log(this.mainLight.transform);
+    this.mainLight.color = [3.3609302043914795, 3.33353328704834, 3.3016586303710938];
+    this.mainLight.color = vec3.scale(this.mainLight.color, this.mainLight.color, 0.3333);
+    // this.mainLight.color = [0.0, 0.0, 0.0];
     // this.mainLight.debugRenderTexture();
+
+    const light2 = new Light();
+    light2.transform.euler = [13.0, 157.0, 0.0];
+    light2.transform.position = [0.2924443483352661, 0.3231116235256195, 0.9000418782234192];
+    light2.transform.position = vec3.scale(vec3.create(), light2.transform.position, 30.0);
+    light2.color = [0.2, 0.3, 0.4];
+    // light2.debugRenderTexture();
+
+    // const a = new GameNode(new Sprite('resources/i_src.png'), `debug_shadowmap_${this.index}`);
+    // a.renderable.rect = new Rect(0, 300, 300, 300);
+
+    this.addEvent('PosToNode', this.PosToNode, this);
 
     for (let i = 0; i < onStarts.length; i += 1) {
       this.node.addComponent(new onStarts[i](this));
     }
 
-    for (let i = onloadDefault.length - 1; i >= 0; i -= 1) {
-      onloadDefault[i]();
-    }
+    this.triggerEvent('OnLoadMesh', [[this.node]]);
   }
 
   update(dt) {
+    // setFrameDirty();
+    // const e = this.mainLight.transform.euler;
+    // e[1] += dt * 30.0;
+    // this.mainLight.transform.euler = e;
+    // this.mainLight.transform.position = vec3.scale(
+    //   vec3.create(), this.mainLight.transform.forward, 3.0,
+    // );
     for (let c = this.nodeGroup.length - 1; c >= 0; c -= 1) {
       if (this.nodeGroup[c]) this.nodeGroup[c].update(dt);
     }
@@ -251,15 +267,28 @@ export default class Application {
     }
   }
 
+  // eslint-disable-next-line class-methods-use-this
   render() {
-    for (let i = 0, max = allLights.length; i < max; i += 1) {
-      allLights[i].render(this.nodeGroup);
-    }
+    const group = GameNode.getRenderingGroup();
+    const uigroup = GameNode.getRenderingGroupUI();
+
+    allLights.forEach((light) => {
+      light.render(group);
+    });
+
     Light.Update();
+
     gl.viewport(0, 0, screenSize[0], screenSize[1]);
-    for (let i = 0, max = allCameras.length; i < max; i += 1) {
-      allCameras[i].render(this.nodeGroup, i === 0, Light);
-    }
+    allCameras.forEach((cam, i) => {
+      if (!cam.ui) {
+        cam.render(group, i === 0, Light);
+      }
+    });
+    allCameras.forEach((cam) => {
+      if (cam.ui) {
+        cam.render2D(uigroup, false, Light);
+      }
+    });
 
     const err = gl.getError();
     if (err !== gl.NO_ERROR) {
@@ -268,20 +297,14 @@ export default class Application {
     }
   }
 
-  loadTexture(url, token) {
-    const self = this;
-    const tex = new Texture2D();
-    tex.loadFromUrl(url, () => {
-      self.node.renderable.material.setUniformData('uAlbedo', tex);
-    }, token);
-  }
-
-  loadObj(contents) {
+  loadObj(contents, inputNode) {
+    const nodeTar = inputNode;
     const meshData = ObjLoader(contents);
     // console.log(meshData);
     const min = meshData.aabb[0];
     const max = meshData.aabb[1];
     const diff = vec3.distance(min, max);
+    const allNodes = [nodeTar];
     let scale = 1.0;
     if (diff > 100.0) {
       scale = 5.0 / diff;
@@ -292,58 +315,66 @@ export default class Application {
     size = size || 1;
     let name = objs.length === 0 ? undefined : objs[0];
     // console.log(name);
-    this.node.renderable.LoadMesh(meshData, name);
-    this.node.transform.scale = [scale, scale, scale];
-    this.node.transform.position = [0.0, 0.0, 0.0];
-    this.node.transform.euler = [0, 0, 0];
+    nodeTar.renderable.LoadMesh(meshData, name);
+    nodeTar.transform.scale = [scale, scale, scale];
+    nodeTar.transform.position = [0.0, 0.0, 0.0];
+    nodeTar.transform.euler = [0, 0, 0];
+    // console.log(`find ${size} objects`);
 
-    for (let i = this.other_nodes.length - 1; i >= 0; i -= 1) {
-      for (let c = this.nodeGroup.length - 1; c >= 0; c -= 1) {
-        if (this.nodeGroup[c] === this.other_nodes[i]) {
-          this.nodeGroup.splice(c, 1);
-        }
-      }
-    }
-    this.other_nodes.splice(0, this.other_nodes.length);
     for (let i = 1; i < size; i += 1) {
       name = objs[i];
       // console.log(name);
-      const node = new GameNode(new Mesh('default_orig', cubeText), `mesh_${name}`);
+      const node = this.GetNextNode();
+      // console.log(node);
+      node.name = `mesh_${name}`;
       node.renderable.LoadMesh(meshData, name);
       node.transform.scale = [scale, scale, scale];
       node.transform.position = [0.0, 0.0, 0.0];
       node.transform.euler = [0, 0, 0];
-      this.other_nodes.push(node);
+      allNodes.push(node);
     }
-    // console.log(this.other_nodes);
+    // console.log(this.nodes);
     // this.node.renderable.LoadObj(contents);
-    this.triggerOnLoadMesh();
+    this.triggerEvent('OnLoadMesh', [allNodes]);
   }
 
-  addOnLoadMesh(func, obj = undefined) {
-    this.onLoadMesh.push({ func, obj });
-  }
-
-  triggerOnLoadMesh(mesh) {
-    const meshArr = [mesh];
-    for (let i = this.onLoadMesh.length - 1; i >= 0; i -= 1) {
-      this.onLoadMesh[i].func.apply(this.onLoadMesh[i].obj, meshArr);
+  addEvent(event, func, obj = undefined) {
+    if (!(event in this.events)) {
+      this.events[event] = [];
     }
-    setFrameDirty();
+    this.events[event].push({ func, obj });
   }
 
-  loadMesh(url, token) {
+  triggerEvent(event, data) {
+    if (event in this.events) {
+      const dataArr = Array.isArray(data) ? data : [data];
+      const ls = this.events[event];
+      // console.log(dataArr);
+      for (let i = ls.length - 1; i >= 0; i -= 1) {
+        const { func, obj } = ls[i];
+        func.apply(obj, dataArr);
+      }
+      setFrameDirty();
+    }
+  }
+
+  loadMesh(url, token, callback, onfailed) {
     const self = this;
     ReadFile.read(url, (contents) => {
-      self.loadObj(contents);
+      if (contents) {
+        self.loadObj(contents, self.node);
+        if (callback) callback();
+      } else if (onfailed) onfailed();
     }, undefined, token);
   }
 
-  loadHair(url, token) {
+  loadHair(url, token, inputNode) {
     const self = this;
+    let nodeTar = inputNode;
+    if (nodeTar === undefined) nodeTar = self.node;
     ReadFile.readBinary(url, (contents) => {
-      self.node.renderable.LoadHair(contents);
-      self.triggerOnLoadMesh(self.node.renderable);
+      nodeTar.renderable.LoadHair(contents);
+      self.triggerEvent('OnLoadMesh', [[nodeTar]]);
     }, undefined, token);
   }
 
@@ -354,8 +385,11 @@ export default class Application {
     }, undefined, token);
   }
 
-  loadFBX(url, token) {
+  loadFBX(url, token, inputNode) {
     const self = this;
+    let nodeTar = inputNode;
+    if (nodeTar === undefined) nodeTar = self.node;
+    const allNodes = [nodeTar];
     fbxloader.fbxloader.load(url, (fbxTree) => {
       const meshes = [];
       fbxTree.forEach((value) => {
@@ -363,35 +397,75 @@ export default class Application {
           meshes.push(value);
         }
       });
+      // console.log(meshes);
 
       if (meshes.length > 0) {
-        self.node.renderable.LoadFBX(meshes[0], fbxTree);
+        nodeTar.renderable.LoadFBX(meshes[0], fbxTree);
         const t = meshes[0].transform;
-        if ('euler' in t) self.node.transform.euler = t.euler;
-        if ('scale' in t) self.node.transform.scale = t.scale;
-        if ('position' in t) self.node.transform.position = t.position;
+        if (('name' in t) && t.name) nodeTar.name = t.name;
+        if ('euler' in t) nodeTar.transform.euler = t.euler;
+        if ('scale' in t) nodeTar.transform.scale = t.scale;
+        if ('position' in t) nodeTar.transform.position = t.position;
       }
       if (meshes.length > 1) {
-        for (let i = self.other_nodes.length - 1; i >= 0; i -= 1) {
-          for (let c = self.nodeGroup.length - 1; c >= 0; c -= 1) {
-            if (self.nodeGroup[c] === self.other_nodes[i]) {
-              self.nodeGroup.splice(c, 1);
-            }
-          }
-        }
-        self.other_nodes.splice(0, self.other_nodes.length);
         for (let i = 1; i < meshes.length; i += 1) {
-          const node = new GameNode(new Mesh('default_orig', cubeText), `mesh_${i}`);
+          const node = self.GetNextNode();
           node.renderable.LoadFBX(meshes[i], fbxTree);
           const t = meshes[i].transform;
+          if (('name' in t) && t.name) node.name = t.name;
           if ('euler' in t) node.transform.euler = t.euler;
           if ('scale' in t) node.transform.scale = t.scale;
           if ('position' in t) node.transform.position = t.position;
-          self.other_nodes.push(node);
+          allNodes.push(node);
         }
       }
-      self.triggerOnLoadMesh(self.node.renderable);
+      self.triggerEvent('OnLoadMesh', [allNodes]);
     }, token);
+  }
+
+  loadTexture(url, token = undefined) {
+    const self = this;
+    const tex = new Texture2D();
+    const filelower = url.toLowerCase();
+    let uniforName = 'uAlbedo';
+    if (filelower.includes('normal')) {
+      uniforName = 'uNormal';
+    } else if (filelower.includes('spec')) {
+      uniforName = 'uSpecular';
+    } else if (filelower.includes('gloss')) {
+      uniforName = 'uGloss';
+    } else if (filelower.includes('translucency')) {
+      uniforName = 'uTranslucency';
+    } else if (filelower.includes('env')) {
+      uniforName = 'uEnvir';
+    }
+    tex.loadFromUrl(url, () => {
+      // console.log(`loadTexture: ${url}`);
+      for (let i = 0; i < self.nodes.length; i += 1) {
+        self.nodes[i].renderable.material.setUniformData(uniforName, tex, true);
+      }
+    }, token);
+  }
+
+  PosToNode(...args) {
+    const ls = args;
+    if (ls[0][0] === undefined) {
+      const node = this.nodes[0];
+      ls[0][0] = node;
+    }
+    return ls[0][0];
+  }
+
+  GetNextNode() {
+    if (this.nodes.length <= this.nodeCount) {
+      const next = new GameNode(new Mesh('default', cubeText), `mesh_${this.nodeCount}`, true);
+      this.nodes.push(next);
+    }
+    if (this.nodeCount < 0) this.nodeCount = 0;
+    const node = this.nodes[this.nodeCount];
+    this.nodeCount += 1;
+
+    return node;
   }
 }
 
@@ -436,7 +510,7 @@ function loading() {
   } else {
     app = new Application();
     requestAnimationFrame(frame);
-    // logger.oldLog(app);
+    // logger.log(app);
   }
 }
 

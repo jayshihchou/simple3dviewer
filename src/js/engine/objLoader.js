@@ -13,9 +13,55 @@ function calcNormal(v0, v1, v2) {
     (u[0] * v[1]) - (u[1] * v[0])));
 }
 
+function generateNormals(vertices, faces) {
+  const normals = Array(vertices.length).fill(0.0);
+  const sameIndices = Array(vertices.length).fill(0.0);
+  let i;
+  let i0;
+  let i1;
+  let i2;
+  let v0;
+  let v1;
+  let v2;
+  let nor;
+  const imax = faces.length;
+  for (i = 0; i < imax; i += 3) {
+    i0 = faces[i];
+    i1 = faces[i + 1];
+    i2 = faces[i + 2];
+    v0 = vec3.set(vec3.create(), vertices[i0 * 3], vertices[(i0 * 3) + 1], vertices[(i0 * 3) + 2]);
+    v1 = vec3.set(vec3.create(), vertices[i1 * 3], vertices[(i1 * 3) + 1], vertices[(i1 * 3) + 2]);
+    v2 = vec3.set(vec3.create(), vertices[i2 * 3], vertices[(i2 * 3) + 1], vertices[(i2 * 3) + 2]);
+
+    nor = calcNormal(v0, v1, v2);
+    sameIndices[(i0 * 3) + 0] += 1.0;
+    sameIndices[(i0 * 3) + 1] += 1.0;
+    sameIndices[(i0 * 3) + 2] += 1.0;
+    sameIndices[(i1 * 3) + 0] += 1.0;
+    sameIndices[(i1 * 3) + 1] += 1.0;
+    sameIndices[(i1 * 3) + 2] += 1.0;
+    sameIndices[(i2 * 3) + 0] += 1.0;
+    sameIndices[(i2 * 3) + 1] += 1.0;
+    sameIndices[(i2 * 3) + 2] += 1.0;
+
+    normals[(i0 * 3) + 0] += nor[0];
+    normals[(i0 * 3) + 1] += nor[1];
+    normals[(i0 * 3) + 2] += nor[2];
+    normals[(i1 * 3) + 0] += nor[0];
+    normals[(i1 * 3) + 1] += nor[1];
+    normals[(i1 * 3) + 2] += nor[2];
+    normals[(i2 * 3) + 0] += nor[0];
+    normals[(i2 * 3) + 1] += nor[1];
+    normals[(i2 * 3) + 2] += nor[2];
+  }
+  for (i = normals.length - 1; i >= 0; i -= 1) {
+    normals[i] /= sameIndices[i];
+  }
+  return normals;
+}
+
 export default function ObjLoader(fileData) {
   if (fileData === undefined) return undefined;
-
   const lines = fileData.split('\n');
   if (lines === undefined || lines.length === 0) return undefined;
 
@@ -35,7 +81,9 @@ export default function ObjLoader(fileData) {
   const vertices = [];
   const vertexColors = [];
   let normals = [];
-  const uvs = [];
+  let uvs = [];
+  const tangents = [];
+  const bitangents = [];
   const vIndices = [];
   let tIndices = [];
   let nIndices = [];
@@ -124,64 +172,46 @@ export default function ObjLoader(fileData) {
       lastMeshName = line.split(/ /)[1];
       meshDict[lastMeshName] = { ist: vIndices.length, imax: -1 };
       // console.log(meshDict[lastMeshName]);
+    } else if (line[0] === 't' && line[1] === 'a') {
+      vals = line.split(' ');
+      vals[1] = parseFloat(vals[1]);
+      vals[2] = parseFloat(vals[2]);
+      vals[3] = parseFloat(vals[3]);
+      tangents.push(vals[1]);
+      tangents.push(vals[2]);
+      tangents.push(vals[3]);
+    } else if (line[0] === 'b' && line[1] === 'i') {
+      vals = line.split(' ');
+      vals[1] = parseFloat(vals[1]);
+      vals[2] = parseFloat(vals[2]);
+      vals[3] = parseFloat(vals[3]);
+      bitangents.push(vals[1]);
+      bitangents.push(vals[2]);
+      bitangents.push(vals[3]);
     }
   }
+
   if (lastMeshName) {
     meshDict[lastMeshName].imax = vIndices.length;
   }
 
-  if (addTexcoord && tIndices.length === 0) {
+  if (tIndices.length === 0) {
     tIndices = vIndices;
   }
 
-  if (addNormal && nIndices.length === 0) {
+  if (nIndices.length === 0) {
     nIndices = vIndices;
   }
 
+  if (uvs.length === 0) {
+    uvs = Array((vertices.length * 2) / 3).fill(1.0);
+  }
+
+  // normals = [];
   if (normals.length === 0) {
-    normals = Array(vertices.length).fill(0.0);
+    // console.log('generate normals');
+    normals = generateNormals(vertices, vIndices);
     nIndices = vIndices;
-    const sameIndices = Array(vertices.length).fill(0.0);
-    let i0;
-    let i1;
-    let i2;
-    let v0;
-    let v1;
-    let v2;
-    let nor;
-    const imax = vIndices.length;
-    for (i = 0; i < imax; i += 3) {
-      i0 = vIndices[i];
-      i1 = vIndices[i + 1];
-      i2 = vIndices[i + 2];
-      v0 = vec3.set(vec3.create(), vertices[i0 * 3], vertices[(i0 * 3) + 1], vertices[(i0 * 3) + 2]);
-      v1 = vec3.set(vec3.create(), vertices[i1 * 3], vertices[(i1 * 3) + 1], vertices[(i1 * 3) + 2]);
-      v2 = vec3.set(vec3.create(), vertices[i2 * 3], vertices[(i2 * 3) + 1], vertices[(i2 * 3) + 2]);
-
-      nor = calcNormal(v0, v1, v2);
-      sameIndices[(i0 * 3) + 0] += 1.0;
-      sameIndices[(i0 * 3) + 1] += 1.0;
-      sameIndices[(i0 * 3) + 2] += 1.0;
-      sameIndices[(i1 * 3) + 0] += 1.0;
-      sameIndices[(i1 * 3) + 1] += 1.0;
-      sameIndices[(i1 * 3) + 2] += 1.0;
-      sameIndices[(i2 * 3) + 0] += 1.0;
-      sameIndices[(i2 * 3) + 1] += 1.0;
-      sameIndices[(i2 * 3) + 2] += 1.0;
-
-      normals[(i0 * 3) + 0] += nor[0];
-      normals[(i0 * 3) + 1] += nor[1];
-      normals[(i0 * 3) + 2] += nor[2];
-      normals[(i1 * 3) + 0] += nor[0];
-      normals[(i1 * 3) + 1] += nor[1];
-      normals[(i1 * 3) + 2] += nor[2];
-      normals[(i2 * 3) + 0] += nor[0];
-      normals[(i2 * 3) + 1] += nor[1];
-      normals[(i2 * 3) + 2] += nor[2];
-    }
-    for (i = normals.length - 1; i >= 0; i -= 1) {
-      normals[i] /= sameIndices[i];
-    }
   }
 
   // console.log(`vind len: ${vIndices.length}, tind len: ${tIndices.length}, nind len: ${nIndices.length}`);
@@ -189,6 +219,13 @@ export default function ObjLoader(fileData) {
   const faceVertices = Array(vIndices.length * 3).fill(0.0);
   const faceUVs = Array(vIndices.length * 2).fill(0.0);
   const faceNormals = Array(vIndices.length * 3).fill(0.0);
+  const doTangent = tangents.length > 0 && bitangents.length > 0;
+  let faceTangents;
+  let faceBitangents;
+  if (doTangent) {
+    faceTangents = Array(vIndices.length * 3).fill(0.0);
+    faceBitangents = Array(vIndices.length * 3).fill(0.0);
+  }
   const imax = vIndices.length;
   let vID;
   for (i = 0; i < imax; i += 1) {
@@ -196,6 +233,14 @@ export default function ObjLoader(fileData) {
     faceVertices[i * 3] = vertices[vID * 3];
     faceVertices[i * 3 + 1] = vertices[(vID * 3) + 1];
     faceVertices[i * 3 + 2] = vertices[(vID * 3) + 2];
+    if (doTangent) {
+      faceTangents[i * 3] = tangents[vID * 3];
+      faceTangents[i * 3 + 1] = tangents[(vID * 3) + 1];
+      faceTangents[i * 3 + 2] = tangents[(vID * 3) + 2];
+      faceBitangents[i * 3] = bitangents[vID * 3];
+      faceBitangents[i * 3 + 1] = bitangents[(vID * 3) + 1];
+      faceBitangents[i * 3 + 2] = bitangents[(vID * 3) + 2];
+    }
     vID = tIndices[i];
     faceUVs[i * 2] = uvs[vID * 2];
     faceUVs[i * 2 + 1] = uvs[(vID * 2) + 1];
@@ -208,10 +253,10 @@ export default function ObjLoader(fileData) {
   const aabb = [];
   aabb[0] = [minX, minY, minZ];
   aabb[1] = [maxX, maxY, maxZ];
-  // console.log(meshDict);
-  // console.log(Object.keys(meshDict).length);
-  // console.oldLog(normals);
-  // console.oldLog(vertices);
+  // console.slog(meshDict);
+  // console.slog(Object.keys(meshDict).length);
+  // console.log(normals);
+  // console.log(vertices);
   return {
     vertices,
     uvs,
@@ -219,6 +264,8 @@ export default function ObjLoader(fileData) {
     faceVertices,
     faceUVs,
     faceNormals,
+    faceTangents,
+    faceBitangents,
     vertexColors,
     faces: vIndices,
     uv_faces: tIndices,
@@ -228,4 +275,4 @@ export default function ObjLoader(fileData) {
   };
 }
 
-export { ObjLoader };
+export { ObjLoader, generateNormals };
