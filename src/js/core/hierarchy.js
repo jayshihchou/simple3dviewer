@@ -17,18 +17,23 @@ export default class Hierarchy {
     this.addNodeButton.setText('Create');
     this.addNodeButton.notify.push(this);
     this.CreateNewNode = function onCreateNewNode() {
+      this.RefreshLater();
       return app.GetNextNode();
     };
     this.hierarchy.addWidget(this.addNodeButton);
     this.itemButtons = [];
+    this.renderingStatus = [];
     this.Refresh();
     this.hierarchy.Refresh();
     this.lastClicked = undefined;
     app.addEvent('PosToNode', this.PosToNode, this);
-    app.addEvent('OnLoadMesh', this.Refresh, this);
+    app.addEvent('OnLoadMesh', this.RefreshLater, this);
     this.hierarchy.enabled = false;
-    this.renderingStatus = [];
     input.eventListeners.push(this);
+  }
+
+  RefreshLater() {
+    this.update = this.Refresh;
   }
 
   Refresh() {
@@ -45,12 +50,26 @@ export default class Hierarchy {
         b.enabled = this.hierarchy.enabled;
         this.hierarchy.addWidget(b);
         this.itemButtons.push(b);
+        this.renderingStatus.push(nodes[i].renderable.material.blendType);
       }
     }
-    for (i = 0; i < imax; i += 1) {
-      this.itemButtons[i].setText(`${nodes[i].name} : No Blend`);
-    }
+    this.itemButtons.forEach((button, j) => {
+      let typeStr = '';
+      switch (this.renderingStatus[j]) {
+        case 1:
+          typeStr = 'Alpha';
+          break;
+        case 2:
+          typeStr = 'Add';
+          break;
+        default:
+          typeStr = 'No Blend';
+          break;
+      }
+      button.setText(`${nodes[j].name} : ${typeStr}`);
+    });
     this.hierarchy.Refresh();
+    this.update = undefined;
   }
 
   // update() {
@@ -61,7 +80,6 @@ export default class Hierarchy {
   OnClick(button) {
     if (this.addNodeButton === button) {
       this.CreateNewNode();
-      this.Refresh();
       return;
     }
     let i;
@@ -102,6 +120,7 @@ export default class Hierarchy {
 
   PosToNode(...args) {
     const ls = args;
+    this.RefreshLater();
     if (this.hierarchy.enabled) {
       // console.log(this);
       // console.log(ls[1]);
