@@ -203,8 +203,10 @@ export default function ObjLoader(fileData) {
     nIndices = vIndices;
   }
 
+  // console.log(vertices.length / 3);
+  // console.log(uvs.length / 2);
   if (uvs.length === 0) {
-    uvs = Array((vertices.length * 2) / 3).fill(1.0);
+    uvs = Array((vertices.length * 2) / 3).fill(0.5);
   }
 
   // normals = [];

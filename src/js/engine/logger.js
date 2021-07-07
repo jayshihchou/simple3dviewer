@@ -1,16 +1,21 @@
-﻿const LogType = Object.freeze({ Log: 0, Warning: 1, Error: 2 });
+﻿/* eslint-disable no-console */
+import { isMobile } from './utils.js';
 
-class Logger {
+const LogType = Object.freeze({ Log: 0, Warning: 1, Error: 2 });
+
+export default class Logger {
   constructor() {
     this.canvas = document.getElementById('text');
     this.ctx = this.canvas.getContext('2d');
+    if (isMobile) this.font = '1.2em "Fira Sans", serif';
+    else this.font = '0.8em "Fira Sans", serif';
 
     this.canvas.width = 800;
     this.canvas.height = 800;
 
     this.logs = [];
     // show stack not including logger.
-    this.showStack = true;
+    this.showStack = false;
     // shows full stack including logger.
     this.showFullStack = false;
 
@@ -104,6 +109,7 @@ class Logger {
           this.ctx.fillStyle = 'white';
           break;
       }
+      this.ctx.font = this.font;
       messages = message.split('\n');
       for (i = 0, imax = messages.length; i < imax; i += 1) {
         this.ctx.fillText(messages[i], 10, 32 + line * 18);

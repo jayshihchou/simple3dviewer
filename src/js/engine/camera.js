@@ -34,6 +34,7 @@ export default class Camera {
     this.viewport = [0.0, 0.0, 1.0, 1.0];
 
     this.trans = new Transform();
+    this.dirty = false;
 
     allCameras.push(this);
   }
@@ -53,28 +54,14 @@ export default class Camera {
 
   set ortho(ortho) {
     this.orthoTag = ortho;
-    if (this.orthoTag) {
-      this.projectionMatrix = mat4.ortho(mat4.create(),
-        -this.orthoTagSize * this.aspect,
-        this.orthoTagSize * this.aspect,
-        -this.orthoTagSize,
-        this.orthoTagSize,
-        this.zNear,
-        this.zFar);
-    } else {
-      this.projectionMatrix = mat4.perspective(mat4.create(),
-        toRad(this.fieldOfView),
-        this.aspect,
-        this.zNear,
-        this.zFar);
-    }
+    this.dirty = true;
   }
 
   get orthoSize() { return this.orthoTagSize; }
 
   set orthoSize(orthoSize) {
     this.orthoTagSize = orthoSize;
-    this.updateProjectionMatrix();
+    this.dirty = true;
   }
 
   get resolution() {
@@ -87,7 +74,8 @@ export default class Camera {
       this.height = height;
     }
     this.aspect = this.width / this.height;
-    this.updateProjectionMatrix();
+    // console.slog(`(w: ${this.width}, h: ${this.height}), aspect: ${this.aspect}`);
+    this.dirty = true;
     return this;
   }
 
@@ -101,21 +89,25 @@ export default class Camera {
         this.zNear,
         this.zFar);
     } else {
+      // const fov = toRad(this.fieldOfView);
+      // console.slog(`fov ${this.fieldOfView}, rad ${fov}`);
       this.projectionMatrix = mat4.perspective(mat4.create(),
         toRad(this.fieldOfView),
         this.aspect,
         this.zNear,
         this.zFar);
     }
+    this.dirty = false;
   }
 
   setFOV(fov) {
     this.fieldOfView = fov;
-    this.updateProjectionMatrix();
+    this.dirty = true;
   }
 
   render(nodeGroup, drawDebugDraw = false, Light = undefined, material = undefined) {
     if (!this.enabled) return this;
+    if (this.dirty) this.updateProjectionMatrix();
     if (this.viewport[0] !== 0.0 || this.viewport[1] !== 0.0 || this.viewport[2] !== 1.0 || this.viewport[3] !== 1.0) {
       gl.viewport(this.viewport[0], this.viewport[1], this.viewport[2], this.viewport[3]);
     }
@@ -152,6 +144,7 @@ export default class Camera {
 
   render2D(nodeGroup, Light = undefined) {
     if (!this.enabled) return this;
+    if (this.dirty) this.updateProjectionMatrix();
     if (this.viewport[0] !== 0.0 || this.viewport[1] !== 0.0 || this.viewport[2] !== 1.0 || this.viewport[3] !== 1.0) {
       gl.viewport(this.viewport[0], this.viewport[1], this.viewport[2], this.viewport[3]);
     }

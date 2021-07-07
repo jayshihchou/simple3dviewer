@@ -11,7 +11,7 @@ import { allLights, Light } from '../engine/light.js';
 import { input } from '../engine/inputmanager.js';
 import {
   setFrameDirty, getFrameDirty, screenSize,
-  resizeListeners, realScreenSize, updateScreenSize,
+  resizeListeners, realScreenSize, updateScreenSize, isMobile,
 } from '../engine/utils.js';
 import { Texture2D } from '../engine/texture.js';
 import { timer } from '../engine/timer.js';
@@ -78,7 +78,7 @@ function onResize(width, height) {
   }
 
   for (let i = resizeListeners.length - 1; i >= 0; i -= 1) {
-    if (resizeListeners[i].OnResize !== undefined) resizeListeners[i].OnResize(screenSize, newSize);
+    if (resizeListeners[i].OnResize) resizeListeners[i].OnResize(screenSize, newSize);
   }
   updateScreenSize(newSize[0], newSize[1]);
 }
@@ -89,19 +89,57 @@ function resizeToMatchDisplaySize(canvas) {
   realScreenSize[1] = canvas.clientHeight;
   // var displayWidth = canvas.clientWidth * window.devicePixelRatio;
   // var displayHeight = canvas.clientHeight * window.devicePixelRatio;
-  const viewportSize = getViewportSize();
-  const displayWidth = viewportSize[0];
-  const displayHeight = viewportSize[1];
+  let [displayWidth, displayHeight] = getViewportSize();
+  if (isMobile) [displayWidth, displayHeight] = realScreenSize;
   if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
     // eslint-disable-next-line no-param-reassign
     canvas.width = displayWidth;
     // eslint-disable-next-line no-param-reassign
     canvas.height = displayHeight;
-    // console.log('re screen size : ' + canvas.width + ', ' + canvas.height);
+    // console.slog(`size: (${canvas.width}, ${canvas.height})`);
+    // console.slog(`real size: (${realScreenSize[0]}, ${realScreenSize[1]})`);
     onResize(displayWidth, displayHeight);
     return true;
   }
   return false;
+}
+
+function getTextureNameAndDefine(filelower) {
+  let uniforName = 'uAlbedo';
+  let enableKeyword;
+  if (filelower.includes('normal')) {
+    uniforName = 'uNormal';
+    enableKeyword = 'NORMAL_TEX';
+  } else if (filelower.includes('spec')) {
+    uniforName = 'uSpecular';
+    enableKeyword = 'SPECULAR_TEX';
+  } else if (filelower.includes('gloss')) {
+    uniforName = 'uGloss';
+    enableKeyword = 'GLOSS_TEX';
+  } else if (filelower.includes('translucency')) {
+    uniforName = 'uTranslucency';
+    enableKeyword = 'TRANSLUCENCY_TEX';
+  } else if (filelower.includes('env')) {
+    uniforName = 'uEnvir';
+    enableKeyword = 'ENVIR_TEX';
+  } else if (filelower.includes('cavity')) {
+    uniforName = 'uCavity';
+    enableKeyword = 'CAVITY_TEX';
+  } else if (filelower.includes('ao')) {
+    uniforName = 'uAO';
+    enableKeyword = 'AO_TEX';
+  } else if (filelower.includes('metallic')) {
+    uniforName = 'uMetallic';
+    enableKeyword = 'METALLIC_TEX';
+  } else if (filelower.includes('roughness')) {
+    uniforName = 'uRoughness';
+    enableKeyword = 'ROUGHNESS_TEX';
+  } else if (filelower.includes('nrrt')) {
+    uniforName = 'uSpecular';
+    enableKeyword = 'MH';
+  }
+  console.log(`uniforName ${uniforName}, enableKeyword ${enableKeyword}`);
+  return [uniforName, enableKeyword];
 }
 
 function onFilesEnter(files, p) {
@@ -122,30 +160,27 @@ function onFilesEnter(files, p) {
         reader.addEventListener('load', function loadtexture() {
           const tex = new Texture2D();
           const url = this.result;
-          let uniforName = 'uAlbedo';
-          if (filelower.includes('normal')) {
-            uniforName = 'uNormal';
-          } else if (filelower.includes('spec')) {
-            uniforName = 'uSpecular';
-          } else if (filelower.includes('gloss')) {
-            uniforName = 'uGloss';
-          } else if (filelower.includes('translucency')) {
-            uniforName = 'uTranslucency';
-          } else if (filelower.includes('env')) {
-            uniforName = 'uEnvir';
-          }
+          const [uniforName, enableKeyword] = getTextureNameAndDefine(filelower);
+
           tex.loadFromUrl(url, () => {
-            if (node.renderable.material.setUniformData(uniforName, tex, true)) {
-              // console.log(`set ${uniforName} for ${f.name}`);
-              // console.log(node);
-              // console.log(tex);
-              // console.log(node.renderable.material);
+            node.renderable.material.setUniformData(uniforName, tex, true);
+            if (enableKeyword) {
+              node.renderable.material.addOrUpdateDefine(enableKeyword, 1);
             }
           });
         }, false);
         reader.readAsDataURL(f);
       } else {
+        let skinTag = false;
+        if (filelower.includes('skin')) {
+          skinTag = true;
+        }
         node.name = f.name;
+        if (skinTag) {
+          node.renderable.material.addOrUpdateDefine('SKIN', 1);
+        } else {
+          node.renderable.material.removeDefine('SKIN');
+        }
         if (ext === 'obj') {
           const reader = new FileReader();
           reader.onloadend = (function onloadend(r) {
@@ -209,11 +244,12 @@ export default class Application {
     this.events = {};
 
     this.node = new GameNode(new Mesh(
-      'default',
+      'pbr',
       cubeText,
     ), 'main_node', true);
     this.node.transform.scale = [0.1, 0.1, 0.1];
     this.nodeCount = 1;
+    this.firstIsEmpty = true;
 
     this.nodes = [this.node];
 
@@ -307,7 +343,6 @@ export default class Application {
     const min = meshData.aabb[0];
     const max = meshData.aabb[1];
     const diff = vec3.distance(min, max);
-    const allNodes = [nodeTar];
     let scale = 1.0;
     if (diff > 100.0) {
       scale = 5.0 / diff;
@@ -334,11 +369,10 @@ export default class Application {
       node.transform.scale = [scale, scale, scale];
       node.transform.position = [0.0, 0.0, 0.0];
       node.transform.euler = [0, 0, 0];
-      allNodes.push(node);
     }
     // console.log(this.nodes);
     // this.node.renderable.LoadObj(contents);
-    this.triggerEvent('OnLoadMesh', [allNodes]);
+    this.triggerEvent('OnLoadMesh', [this.nodes]);
   }
 
   addEvent(event, func, obj = undefined) {
@@ -361,14 +395,16 @@ export default class Application {
     }
   }
 
-  loadMesh(url, token, callback, onfailed, createNewNode = false) {
+  loadMesh(url, token, callback, onfailed, findOrCreate = false, shaderName = 'pbr') {
     const self = this;
     ReadFile.read(url, (contents) => {
       if (contents) {
         let { node } = self;
-        if (createNewNode) node = self.GetNextNode();
+        if (findOrCreate) {
+          node = self.FindOrCreateNode(findOrCreate, shaderName);
+        }
         self.loadObj(contents, node);
-        if (callback) callback();
+        if (callback) callback(node);
       } else if (onfailed) onfailed();
     }, undefined, token);
   }
@@ -379,7 +415,10 @@ export default class Application {
     if (nodeTar === undefined) nodeTar = self.node;
     ReadFile.readBinary(url, (contents) => {
       nodeTar.renderable.LoadHair(contents);
-      self.triggerEvent('OnLoadMesh', [[nodeTar]]);
+      nodeTar.transform.scale = [1.0, 1.0, 1.0];
+      nodeTar.transform.position = [0.0, 0.0, 0.0];
+      nodeTar.transform.euler = [0, 0, 0];
+      self.triggerEvent('OnLoadMesh', [self.nodes]);
     }, undefined, token);
   }
 
@@ -394,7 +433,6 @@ export default class Application {
     const self = this;
     let nodeTar = inputNode;
     if (nodeTar === undefined) nodeTar = self.node;
-    const allNodes = [nodeTar];
     fbxloader.fbxloader.load(url, (fbxTree) => {
       const meshes = [];
       fbxTree.forEach((value) => {
@@ -421,10 +459,9 @@ export default class Application {
           if ('euler' in t) node.transform.euler = t.euler;
           if ('scale' in t) node.transform.scale = t.scale;
           if ('position' in t) node.transform.position = t.position;
-          allNodes.push(node);
         }
       }
-      self.triggerEvent('OnLoadMesh', [allNodes]);
+      self.triggerEvent('OnLoadMesh', [self.nodes]);
     }, token);
   }
 
@@ -432,25 +469,19 @@ export default class Application {
     const self = this;
     const tex = new Texture2D();
     const filelower = url.toLowerCase();
-    let uniforName = 'uAlbedo';
     let nodes = toNodes;
     if (!nodes) nodes = self.nodes;
-    if (filelower.includes('normal')) {
-      uniforName = 'uNormal';
-    } else if (filelower.includes('spec')) {
-      uniforName = 'uSpecular';
-    } else if (filelower.includes('gloss')) {
-      uniforName = 'uGloss';
-    } else if (filelower.includes('translucency')) {
-      uniforName = 'uTranslucency';
-    } else if (filelower.includes('env')) {
-      uniforName = 'uEnvir';
-    }
+    const [uniforName, enableKeyword] = getTextureNameAndDefine(filelower);
     tex.loadFromUrl(url, () => {
       // console.log(`loadTexture: ${url}`);
       nodes.forEach((n) => {
         n.renderable.material.setUniformData(uniforName, tex, true);
       });
+      if (enableKeyword) {
+        nodes.forEach((n) => {
+          n.renderable.material.addOrUpdateDefine(enableKeyword, 1);
+        });
+      }
     }, token);
   }
 
@@ -463,15 +494,39 @@ export default class Application {
     return ls[0][0];
   }
 
-  GetNextNode() {
+  GetNextNode(shader = undefined) {
     if (this.nodes.length <= this.nodeCount) {
-      const next = new GameNode(new Mesh('default', cubeText), `mesh_${this.nodeCount}`, true);
+      let shaderName = shader;
+      if (!shaderName) shaderName = 'pbr';
+      const next = new GameNode(new Mesh(shaderName, cubeText), `mesh_${this.nodeCount}`, true);
       this.nodes.push(next);
     }
     if (this.nodeCount < 0) this.nodeCount = 0;
     const node = this.nodes[this.nodeCount];
     this.nodeCount += 1;
 
+    return node;
+  }
+
+  FindNode(name) {
+    let i = 0;
+    for (i = this.nodes.length - 1; i >= 0; i -= 1) {
+      if (this.nodes[i].name === name) return this.nodes[i];
+    }
+    return undefined;
+  }
+
+  FindOrCreateNode(name, shader = undefined) {
+    let node;
+    if (name !== undefined) node = this.FindNode(name);
+    if (node === undefined) {
+      if (this.firstIsEmpty) {
+        this.firstIsEmpty = false;
+        node = this.GetLastNode();
+      } else {
+        node = this.GetNextNode(shader);
+      }
+    }
     return node;
   }
 

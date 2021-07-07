@@ -15,6 +15,7 @@ export default class TestSlider {
     this.text.rect = new Rect().setRelative(0.03, 0.55, 0.1, 0.05);
     this.text.setText('0');
     this.text.setTextColor([1.0, 1.0, 1.0, 1.0]);
+    this.scale = 1.0;
   }
 
   OnValue(slider, value) {
@@ -22,8 +23,8 @@ export default class TestSlider {
       if (this.value !== value) {
         this.value = value;
         // console.log(value * 10000.0);
-        this.renderable.material.setUniformData('testFloat', this.value * 10.0);
-        this.text.setText(this.value * 10.0);
+        this.renderable.material.setUniformData('uFresnelOcc', this.value * this.scale);
+        this.text.setText(this.value * this.scale);
       }
     }
   }

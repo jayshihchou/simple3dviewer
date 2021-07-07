@@ -153,9 +153,8 @@ export default class LightControl {
     });
 
     const dist = vec3.distance(allMin, allMax);
-    // console.log(`max dist ${this.maxDist}, dist: ${dist}`);
-    if (this.maxDist > dist) return;
     this.maxDist = dist;
+    // console.log(`max dist ${this.maxDist}, dist: ${dist}`);
     const center = vec3.add(vec3.create(), allMin, allMax);
     vec3.scale(center, center, 0.5);
     this.look_at_target = center;
@@ -163,19 +162,24 @@ export default class LightControl {
     const targetDist = dist * 1.5;
     this.target_dist = targetDist;
 
+    const close = clamp(Math.min(Math.min(allMin[0], allMin[1]), allMin[2]), 1e-4, 1.0);
+
     allLights.forEach((light) => {
       const cam = light.camera;
       cam.orthoSize = dist * 0.6;
-      if (cam.zFar < dist * 5.0) {
-        cam.zFar = dist * 5.0;
-        // console.log(`zFar: ${cam.zFar}`);
-      }
+      // if (cam.zFar < dist * 5.0) {
+      //   cam.zFar = dist * 5.0;
+      //   console.slog(`zFar: ${cam.zFar}`);
+      // }
+      cam.zFar = dist * 5.0;
+      // console.log(`zFar: ${cam.zFar}`);
 
-      const close = clamp(Math.min(Math.min(allMin[0], allMin[1]), allMin[2]), 1e-4, 1.0) * 0.5;
-      if (cam.zNear > close) {
-        cam.zNear = close;
-        // console.log(`zFar: ${cam.zNear}`);
-      }
+      // if (cam.zNear > close) {
+      //   cam.zNear = close;
+      //   console.slog(`zNear: ${cam.zNear}`);
+      // }
+      cam.zNear = close;
+      // console.log(`zNear: ${cam.zNear}`);
 
       cam.updateProjectionMatrix();
       updateLightPos(light, targetDist, center);

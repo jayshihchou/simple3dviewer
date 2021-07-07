@@ -89,9 +89,10 @@ export default class Button {
     if (this.pressing) {
       if (this.rect.contains([e.x, e.y])) {
         if (this.onClick !== undefined) this.onClick();
-        for (let i = this.notify.length - 1; i >= 0; i -= 1) {
-          if (this.notify[i].OnClick !== undefined) this.notify[i].OnClick(this);
-        }
+        const self = this;
+        this.notify.forEach((t) => {
+          if (t.OnClick !== undefined) t.OnClick(self);
+        });
       }
       this.background.color = this.color;
     }

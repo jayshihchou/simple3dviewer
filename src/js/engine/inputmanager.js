@@ -151,6 +151,8 @@ function onTouchMove(e) {
   let deltaY = newY - input.lastMouseY;
   if (deltaX === undefined || Number.isNaN(deltaX)) deltaX = 0;
   if (deltaY === undefined || Number.isNaN(deltaY)) deltaY = 0;
+  deltaX *= 0.4;
+  deltaY *= 0.4;
   let touchEvent;
   if (e.touches.length > 1) {
     const touch2X = e.touches[1].clientX * devicePixelRatio;

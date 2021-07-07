@@ -2,7 +2,7 @@
 /* eslint-disable max-len */
 /* eslint-disable no-bitwise */
 import { Renderable, DrawingMode } from './renderable.js';
-import { Material } from './material.js';
+import { Material, BlendType } from './material.js';
 import { vec3, vec2 } from '../lib/gl-matrix/index.js';
 import { ObjLoader, generateNormals } from './objLoader.js';
 import { HairLoader } from './hairloader.js';
@@ -344,6 +344,9 @@ export default class Mesh extends Renderable {
       loadName = undefined;
     }
 
+    this.meshVertexCount = vertices.length;
+    this.meshFaceCount = vIndice.length;
+
     const faces = [];
     let vID = -1;
     let t0;
@@ -384,7 +387,7 @@ export default class Mesh extends Renderable {
     //   // n = vec3.scale(n, n, 2.0);
     //   // n = vec3.subtract(n, n, [1.0, 1.0, 1.0]);
     //   // n = vec3.set(n, n[0], n[1], n[2]);
-    //   n = vec3.scale(n, n, 1.0);
+    //   n = vec3.scale(n, n, 0.01);
     //   v1 = vec3.add(vec3.create(), v, n);
     //   lines.push(v[0]);
     //   lines.push(v[1]);
@@ -574,6 +577,7 @@ export default class Mesh extends Renderable {
     this.uploadList(this.faces);
     this.material = new Material('hair');
     this.material.setUniformData('color', [0.6, 0.35, 0.1, 1.0]);
+    this.material.setBlendType(BlendType.Alpha);
     return this;
   }
 
@@ -750,6 +754,8 @@ export default class Mesh extends Renderable {
     ];
     let normal = mesh.buffers.normal;
     if (normal.length === 0) normal = generateNormals(mesh.buffers.meshVertices, mesh.buffers.vertexIndex);
+    this.meshVertexCount = mesh.buffers.meshVertices.length;
+    this.meshFaceCount = mesh.buffers.vertexIndex.length;
 
     let [faceTangents, faceBitangents] = calcTangents(mesh.buffers.vertex, mesh.buffers.uvs[0], normal, mesh.buffers.vertexIndex, mesh.buffers.meshVertices.length);
 

@@ -38,7 +38,8 @@ export default class Text extends Widget {
       this.textNode.nodeValue = this.text;
 
       this.OnRectChanged(this.rect, updateRect);
-      if (!this.enabled) this.textNode.nodeValue = '';
+      if (!this.enabled) this.style.display = 'none';
+      else this.style.display = 'block';
     }
     return this;
   }
@@ -51,7 +52,7 @@ export default class Text extends Widget {
 
   setTextSize(size, updateRect = false) {
     this.style.fontSize = `${size}px`;
-    if (updateRect) {
+    if (!this.inputText && updateRect) {
       textSizeCalculator.selectNodeContents(this.textNode);
       const rects = textSizeCalculator.getClientRects();
       const len = (this.text.match(/\n/g) || []).length;
@@ -93,7 +94,8 @@ export default class Text extends Widget {
     }
     if (this.enabled !== this.enabledTag) {
       this.enabledTag = this.enabled;
-      this.textNode.nodeValue = this.enabled ? this.text : '';
+      if (!this.enabled) this.style.display = 'none';
+      else this.style.display = 'block';
     }
   }
 }

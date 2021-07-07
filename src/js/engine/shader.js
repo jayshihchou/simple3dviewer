@@ -261,6 +261,123 @@ void main(void)
   gl_FragColor = vec4(vColor, 1.0);
 }`,
   },
+  brdf: {
+    vs: `precision highp float;
+#pragma DEFINES
+attribute vec3 position;
+attribute vec2 texcoord;
+#pragma UNIFORMS
+
+varying mediump vec2 vTexcoord;
+
+void main(void) {
+  vTexcoord = texcoord;
+  gl_Position = vec4(position, 1.0); 
+}`,
+    fs: `#pragma DEFINES
+precision mediump float;
+varying vec2 vTexcoord;
+
+#define M_PI2 6.283185307179586
+#define SAMPLE_COUNT 1024
+
+#pragma UNIFORMS
+
+float VanDerCorpus(int n, int base) {
+  float invBase = 1.0 / float(base);
+  float denom = 1.0;
+  float result = 0.0;
+
+  for (int i = 0; i < 32; ++i) {
+    if (n > 0) {
+      denom = mod(float(n), 2.0);
+      result += denom * invBase;
+      invBase = invBase / 2.0;
+      n = int(float(n) / 2.0);
+    }
+  }
+
+  return result;
+}
+
+vec2 Hammersley(int i, int N) {
+  return vec2(float(i)/float(N), VanDerCorpus(i, 2));
+}
+
+vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness) {
+  float a = roughness * roughness;
+
+  float phi = M_PI2 * Xi.x;
+  float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+  float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+  // from spherical coordinates to cartesian coordinates
+  vec3 H = vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+
+  // from tangent-space vector to world-space sample vector
+  vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+  vec3 tangent = normalize(cross(up, N));
+  vec3 bitangent = cross(N, tangent);
+
+  vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
+  return normalize(sampleVec);
+}
+
+// Smith's Schlick-GGX with k = a * a / 2
+float GeometrySchlickGGX(float NdotV, float roughness) {
+  float a = roughness;
+  float k = (a * a) / 2.0;
+
+  float nom = NdotV;
+  float denom = NdotV * (1.0 - k) + k;
+
+  return nom / denom;
+}
+
+float GeometrySmith(float NdotV, float NdotL, float roughness) {
+  float ggx1 = GeometrySchlickGGX(NdotV, roughness);
+  float ggx2 = GeometrySchlickGGX(NdotL, roughness);
+
+  return ggx1 * ggx2;
+}
+
+vec2 IntegrateBRDF(float NdotV, float roughness) {
+  vec3 V = vec3(sqrt(1.0 - NdotV * NdotV), 0.0, NdotV);
+  float A = 0.0;
+  float B = 0.0;
+  vec3 N = vec3(0.0, 0.0, 1.0);
+
+  for (int i = 0; i < SAMPLE_COUNT; ++i) {
+    // generates a sample vector that's biased towards the preferred alignment direction (importance sampling).
+    vec2 Xi = Hammersley(i, SAMPLE_COUNT);
+    vec3 H = ImportanceSampleGGX(Xi, N, roughness);
+    vec3 L = normalize(2.0 * dot(V, H) * H - V);
+
+    float NdotL = max(L.z, 0.0);
+    float NdotH = max(H.z, 0.0);
+    float VdotH = max(dot(V, H), 0.0);
+
+    if (NdotL > 0.0) {
+      float G = GeometrySmith(max(dot(N, V), 0.0), max(dot(N, L), 0.0), roughness);
+      float G_Vis = (G * VdotH) / (NdotH * NdotV);
+      float Fc = pow(1.0 - VdotH, 5.0);
+
+      A += (1.0 - Fc) * G_Vis;
+      B += Fc * G_Vis;
+    }
+  }
+
+  A /= float(SAMPLE_COUNT);
+  B /= float(SAMPLE_COUNT);
+
+  return vec2(A, B);
+}
+
+void main(void) {
+  vec2 integrateBRDF = IntegrateBRDF(vTexcoord.x, vTexcoord.y);
+  gl_FragColor = vec4(integrateBRDF, 0.0, 1.0);
+}`,
+  },
   hair: {
     vs: `#pragma DEFINES
 attribute vec3 position;
@@ -273,15 +390,15 @@ uniform mat3 normalMatrix;
 
 #pragma UNIFORMS
 
-varying highp vec4 worldPosition;
-varying highp vec3 worldTangent;
+varying highp vec3 vWorldPos;
+varying highp vec3 vWorldTangent;
 
 void main(void)
 {
   vec3 finalPos = position;
   gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
-  worldPosition = modelMatrix * vec4(finalPos, 1.0);
-  worldTangent = (modelMatrix * vec4(tangent, 0.0)).xyz;
+  vWorldPos = (modelMatrix * vec4(finalPos, 1.0)).xyz;
+  vWorldTangent = (modelMatrix * vec4(tangent, 0.0)).xyz;
 }`,
     fs: `
 precision highp float;
@@ -290,8 +407,8 @@ precision highp float;
 #define M_PI 3.14159265358979323846
 #define M_E  2.71828182845904523536
 
-varying highp vec4 worldPosition;
-varying highp vec3 worldTangent;
+varying highp vec3 vWorldPos;
+varying highp vec3 vWorldTangent;
 #pragma UNIFORMS
 
 uniform mat4 viewMatrix;
@@ -335,7 +452,7 @@ vec3 kajiya_kay(vec3 diffuse, vec3 specular, float p, vec3 tangent, vec3 light, 
   vec3 diffuse_colors = diffuse * sinTL;
   float spec = cosTL * cosTE + sinTL * sinTE;
   vec3 specular_colors = specular * pow(max(spec, 0.0), p);
-  return diffuse_colors + specular_colors;
+  return diffuse_colors + specular_colors * 0.5;
 }
 
 float approximate_deep_shadow(float shadow_depth, float light_depth, float strand_radius, float strand_alpha) {
@@ -383,12 +500,16 @@ float approximate_deep_shadows(sampler2D shadow_map, vec4 light_space_strand, fl
   return visibility / total_weight;
 }
 
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+  return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
+}
+
 void main(void)
 {
-  float hair_alpha = 0.3;
+  float hair_alpha = 0.1;
   // === gpaa ===
   vec2 screen_fragment = gl_FragCoord.xy;
-  vec4 world_line = worldPosition;
+  vec4 world_line = vec4(vWorldPos, 1.0);
   mat4 view_projection = projectionMatrix * viewMatrix;
   vec2 resolution = cameraResolution;
   float line_thickness = 2.0;
@@ -404,45 +525,50 @@ void main(void)
   if (converage < 0.001) discard;
 
   converage *= 1.0 / 0.042;
+  vec3 diffuse = pow(color.xyz, vec3(2.1632601288));
 
   // === occlusion & shadow ===
-  // TODO : add occlusion and shadow
-  float occlusion = 1.0;
 #ifdef LIGHT_COUNT
-  // since no array
-  // for (int i = 0; i < LIGHT_COUNT; i++) {
-  //     vec4 shadow_space_fragment = lightMatrices[i] * worldPosition;
-  //     //float approximate_deep_shadows(sampler2D shadow_map, vec4 light_space_strand, float kernel_width, float smoothing, float strand_radius, float strand_opacity)
-  //     occlusion *= approximate_deep_shadows(shadowmaps[i], shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
-  //   }
+  float shadows[4];
+  shadows[0] = shadows[1] = shadows[2] = shadows[3] = 1.0;
   #if LIGHT_COUNT > 0
   vec4 shadow_space_fragment = lightMatrices[0] * vec4(vWorldPos, 1.0);
-  occlusion *= approximate_deep_shadows(shadowmap0, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  shadows[0] = approximate_deep_shadows(shadowmap0, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
   #if LIGHT_COUNT > 1
   shadow_space_fragment = lightMatrices[1] * vec4(vWorldPos, 1.0);
-  occlusion *= approximate_deep_shadows(shadowmap1, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  shadows[1] = approximate_deep_shadows(shadowmap1, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
   #if LIGHT_COUNT > 2
   shadow_space_fragment = lightMatrices[2] * vec4(vWorldPos, 1.0);
-  occlusion *= approximate_deep_shadows(shadowmap2, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  shadows[2] = approximate_deep_shadows(shadowmap2, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
   #if LIGHT_COUNT > 3
   shadow_space_fragment = lightMatrices[3] * vec4(vWorldPos, 1.0);
-  occlusion *= approximate_deep_shadows(shadowmap3, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
+  shadows[3] = approximate_deep_shadows(shadowmap3, shadow_space_fragment, 3.0, 4.0, 15000.0, hair_alpha);
   #endif
   #endif
   #endif
   #endif
 #endif
-  lowp vec3 shading = vec3(1.0, 1.0, 1.0);
+  lowp vec3 Lo = vec3(0.0);
+  highp vec3 eye = normalize(vWorldPos - uCameraPosition);
 #ifdef LIGHT_COUNT
-  shading = vec3(0.0, 0.0, 0.0);
   // === kajiya kay ===
-  highp vec3 eye = normalize(worldPosition.xyz - uCameraPosition);
   for (int i = 0; i < LIGHT_COUNT; i++) {
     //                vec3 diffuse, vec3 specular, float p, vec3 tangent, vec3 light, vec3 eye
-    shading += kajiya_kay(color.xyz, lightColors[i], 80.0, worldTangent, lightDirections[i], eye);
+    vec3 lighting = kajiya_kay(diffuse * lightColors[i], lightColors[i] * 0.25 * shadows[i], 80.0, vWorldTangent, lightDirections[i], eye);
+    lighting *= shadows[i];
+    Lo += lighting;
   }
 #endif
-  gl_FragColor = vec4(shading * occlusion, converage);
+  float NdotV = max(dot(vWorldTangent, eye), 0.0);
+  vec3 F = fresnelSchlickRoughness(NdotV, diffuse, 1.0);
+  vec3 kS = F;
+  vec3 kD = 1.0 - kS;
+  vec3 ambient = kD * diffuse * 0.2;
+
+  vec3 result = ambient + Lo;
+  result = result / (result + vec3(1.0));
+  result = pow(result, vec3(0.46226525728));
+  gl_FragColor = vec4(result, converage);
 }`,
   },
   shadow: {
@@ -472,6 +598,401 @@ void main(void)
 {
   // gl_FragColor.xyz = jH((zw.x / zw.y) * 0.5 + 0.5);
   gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+}`,
+  },
+  pbr: {
+    vs: `#pragma DEFINES
+precision mediump float;
+attribute vec3 position;
+attribute vec3 color;
+attribute vec3 normal;
+attribute vec2 texcoord;
+attribute vec3 tangent;
+attribute vec3 bitangent;
+
+uniform mat4 viewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
+
+#ifdef LIGHT_COUNT
+uniform mat4 lightMatrices[LIGHT_COUNT];
+#endif
+
+#pragma UNIFORMS
+
+varying highp vec3 vWorldPos;
+varying mediump vec3 vTangent;
+varying mediump vec3 vBitangent;
+varying mediump vec3 vNormal;
+varying mediump vec2 vTexcoord;
+
+void main(void)
+{
+  vec3 finalPos = position;
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
+  vTexcoord = texcoord;
+  vNormal = normal;
+  vTangent = tangent;
+  vBitangent = bitangent;
+  vWorldPos = (modelMatrix * vec4(finalPos, 1.0)).xyz;
+}`,
+    fs: `#pragma DEFINES
+#extension GL_OES_standard_derivatives : enable
+
+#define M_PI 3.14159265358979323846
+#define M_E  2.71828182845904523536
+
+precision mediump float;
+uniform sampler2D uAlbedo;
+uniform sampler2D uNormal;
+
+#ifdef CAVITY_TEX
+uniform sampler2D uCavity;
+#endif
+
+#ifdef TRANSLUCENCY_TEX
+uniform sampler2D uTranslucency;
+#endif
+
+#ifdef ENVIR_TEX
+uniform sampler2D uEnvir;
+#endif
+
+#ifdef METALLIC_TEX
+uniform sampler2D uMetallic;
+#endif
+
+#ifdef AO_TEX
+uniform sampler2D uAO;
+#endif
+
+#ifdef ROUGHNESS_TEX
+uniform sampler2D uRoughness;
+#else
+#ifdef SPECULAR_TEX
+uniform sampler2D uSpecular;
+#ifdef GLOSS_TEX
+uniform sampler2D uGloss;
+#endif
+#endif
+#endif
+uniform sampler2D uBRDF;
+
+uniform vec3 uCameraPosition;
+
+#ifdef LIGHT_COUNT
+uniform vec3 lightPositions[LIGHT_COUNT];
+uniform vec3 lightDirections[LIGHT_COUNT];
+uniform vec3 lightColors[LIGHT_COUNT];
+#if LIGHT_COUNT > 0
+uniform sampler2D shadowmap0;
+#if LIGHT_COUNT > 1
+uniform sampler2D shadowmap1;
+#if LIGHT_COUNT > 2
+uniform sampler2D shadowmap2;
+#if LIGHT_COUNT > 3
+uniform sampler2D shadowmap3;
+#endif
+#endif
+#endif
+#endif
+uniform mat4 lightMatrices[LIGHT_COUNT];
+
+struct ShadowData {
+  float val[LIGHT_COUNT];
+};
+#endif
+
+#pragma UNIFORMS
+
+varying highp vec3 vWorldPos; // dv
+varying mediump vec3 vTangent; // dA
+varying mediump vec3 vBitangent; // dB
+varying mediump vec3 vNormal; // dC
+varying mediump vec2 vTexcoord; // d
+
+vec3 UnpackNormal(vec3 normalmap) {
+  vec3 tan = vTangent;
+  vec3 bit = vBitangent;
+  vec3 nor = gl_FrontFacing ? vNormal: -vNormal;
+  normalmap = normalmap * 2.0 - vec3(1.0);
+  vec3 res = tan * normalmap.x + bit * normalmap.y + nor * normalmap.z;
+  return normalize(res);
+}
+
+float DistributionGGX(vec3 N, vec3 H, float roughness) {
+  float a = roughness*roughness;
+  float a2 = a*a;
+  float NdotH = max(dot(N, H), 0.0);
+  float NdotH2 = NdotH*NdotH;
+
+  float nom   = a2;
+  float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+  denom = M_PI * denom * denom;
+
+  return nom / max(denom, 0.0000001); // prevent divide by zero for roughness=0.0 and NdotH=1.0
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness) {
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float nom   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0 - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(max(1.0 - cosTheta, 0.0), 5.0);
+}
+
+float roughnessFromNormal(vec3 worldNormal) {
+  vec3 du = dFdx(worldNormal);
+  vec3 dv = dFdy(worldNormal);
+
+  float variance = 1.0 * (dot(du, du) + dot(dv, dv));
+  float kernelRoughness = clamp(min(2.0 * variance, 1.0), 0.0, 1.0);
+  kernelRoughness = sqrt(sqrt(kernelRoughness));
+  return kernelRoughness;
+}
+
+float approximate_deep_shadow(float shadow_depth, float light_depth, float strand_radius, float strand_alpha) {
+  float depth = max(0.0, light_depth - shadow_depth); // depth of the current strand inside geometry.
+
+  float strand_count = depth * strand_radius;
+
+  if (depth > 1e-10) strand_count += 1.0;
+
+  return pow(1.0 - strand_alpha, strand_count);
+}
+
+float tex2Dproj(sampler2D image, vec2 projected_position, vec2 displacement) {
+  return texture2D(image, projected_position.st + displacement).r;
+}
+
+float approximate_deep_shadows(sampler2D shadow_map, vec4 light_space_vertex, float smoothing, float strand_radius, float strand_opacity, float blur) {
+  float visibility = 0.0;
+  vec2 shadow_map_size = vec2(1536.0, 1536.0);
+
+  float kernel_width = 100.0 * blur;
+  // float kernel_range = (kernel_width - 1.0) / 2.0;
+  float sigma_stddev = (kernel_width * 0.5) / 2.4;
+  float sigma_squared = sigma_stddev * sigma_stddev;
+
+  float light_depth = (light_space_vertex.z / light_space_vertex.w) * 0.5 + 0.5;
+  vec2 shadow_map_stride = smoothing / shadow_map_size; // stride.
+  vec2 projected_position = (light_space_vertex.xy / light_space_vertex.w) * 0.5 + 0.5;
+  vec2 l = vec2(0.19134182940220767, 0.46193971935850725) * blur;
+
+  float total_weight = 0.0;
+  //             -kernel_range <= +kernel_range
+  for (float y = -0.4; y <= 0.4; y += 0.2) {
+    for (float x = -0.4; x <= 0.4; x += 0.2) {
+        float exponent = -1.0 * (x * x + y * y) / 2.0 * sigma_squared; // Gaussian RBDF.
+        float local_weight = 1.0 / (2.0 * M_PI * sigma_squared) * pow(M_E, exponent);
+
+        // float shadow = shadowmapBlur(shadow_map, projected_position, vec2(x, y) * shadow_map_stride, blur, light_depth);
+        float shadow_depth = tex2Dproj(shadow_map, projected_position, vec2(x, y) * shadow_map_stride + l);
+        float shadow = approximate_deep_shadow(shadow_depth, light_depth, strand_radius, strand_opacity);
+        // float shadow = (light_depth < shadow_depth ? 1.0 : 0.0);
+
+        visibility += shadow * local_weight;
+        total_weight += local_weight;
+    }
+  }
+
+  return visibility / total_weight;
+}
+
+#ifdef LIGHT_COUNT
+void ShadowLighting(out ShadowData shadows, float blur) { // eG & eB
+  vec3 worldPos = vWorldPos + blur * (gl_FrontFacing ? vNormal: -vNormal);
+  vec4 pos = vec4(worldPos, 1.0);
+#if LIGHT_COUNT > 0
+  vec4 shadow_space_fragment = lightMatrices[0] * pos;
+  //  float approximate_deep_shadows(sampler2D shadow_map, vec4 light_space_vertex, float smoothing, float strand_radius, float strand_opacity, float blur)
+  shadows.val[0] = approximate_deep_shadows(shadowmap0, shadow_space_fragment, 7.5, 6000.0, 0.08, blur);
+#if LIGHT_COUNT > 1
+  shadow_space_fragment = lightMatrices[1] * pos;
+  shadows.val[1] = approximate_deep_shadows(shadowmap1, shadow_space_fragment, 7.5, 6000.0, 0.08, blur);
+#if LIGHT_COUNT > 2
+  shadow_space_fragment = lightMatrices[2] * pos;
+  shadows.val[2] = approximate_deep_shadows(shadowmap2, shadow_space_fragment, 7.5, 6000.0, 0.08, blur);
+#if LIGHT_COUNT > 3
+  shadow_space_fragment = lightMatrices[3] * pos;
+  shadows.val[3] = approximate_deep_shadows(shadowmap3, shadow_space_fragment, 7.5, 6000.0, 0.08, blur);
+#endif
+#endif
+#endif
+#endif
+}
+#endif
+
+#ifdef ENVIR_TEX
+vec3 environmentmap(vec3 halfView, float gloss) {
+  halfView /= dot(vec3(1.0, 1.0, 1.0), abs(halfView));
+  vec2 fU = abs(halfView.zx) - vec2(1.0, 1.0);
+  vec2 fV = vec2(halfView.x < 0.0 ? fU.x : -fU.x , halfView.z < 0.0 ? fU.y : -fU.y);
+  vec2 texcoord = (halfView.y < 0.0) ? fV : halfView.xz;
+  texcoord = vec2(0.5 * (254.0 / 256.0), 0.125 * 0.5 * (254.0 / 256.0)) * texcoord + vec2(0.5, 0.125 * 0.5);
+  gloss = gloss * 7.0;
+  float fX = fract(gloss);
+  texcoord.y += 0.125 * (gloss - fX);
+  vec4 fZ = texture2D(uEnvir, texcoord);
+  vec3 r = fZ.xyz * (7.0 * fZ.w);
+  return r * r;
+}
+#endif
+
+vec3 Translucency(float translucencyTex, vec3 view, vec3 norm, vec3 lightDir, vec3 transColor) {
+  float distortion = 0.3;
+  float ltscale = 0.3;
+  float power = 8.5;
+  vec3 ltlight = lightDir + norm * distortion;
+  float intensity = pow(clamp(dot(view, -ltlight), 0.0, 1.0), power) * ltscale * translucencyTex;
+  return transColor * intensity;
+}
+
+float CalSpecular(float NdotV, float spec, float gloss) {
+  float C = 1.0 - NdotV;
+  float cSqr = C * C;
+  C *= cSqr * cSqr;
+  C *= gloss * gloss;
+  return (spec - C * spec);
+}
+
+void main(void)
+{
+  vec4 albedoTex = texture2D(uAlbedo, vTexcoord);
+  vec3 albedo = pow(albedoTex.rgb, vec3(2.1632601288));
+
+#ifdef CAVITY_TEX
+  // https://help.quixel.com/hc/en-us/articles/115000612165-What-maps-are-included-and-how-do-I-use-them-
+  float cavity = texture2D(uCavity, vTexcoord).r;
+#else
+  float cavity = 0.2;
+#endif
+
+#ifdef METALLIC_TEX
+  float metallic = texture2D(uMetallic, vTexcoord).r;
+#else
+  float metallic = 0.5;
+#ifdef SKIN
+  metallic = 0.0;
+#endif
+#endif
+  vec3 N = UnpackNormal(texture2D(uNormal, vTexcoord).rgb);
+#ifdef ROUGHNESS_TEX
+  float roughness = texture2D(uRoughness, vTexcoord).r;
+#else
+#ifdef SPECULAR_TEX
+  float roughness = 1.0 - texture2D(uSpecular, vTexcoord).r;
+#ifdef GLOSS_TEX
+  float gloss = texture2D(uGloss, vTexcoord).r;
+#endif
+#else
+  float roughness = 1.0 - roughnessFromNormal(N);
+#ifndef CAVITY_TEX
+  roughness *= 0.87;
+#endif
+  roughness *= roughness;
+#endif
+#endif
+#ifdef AO_TEX
+  float ao = texture2D(uAO, vTexcoord).r;
+#else
+  float ao = 1.0;
+#endif
+  vec3 view = normalize(uCameraPosition - vWorldPos);
+
+#ifdef TRANSLUCENCY_TEX
+  float translucencyTex = texture2D(uTranslucency, vTexcoord).r;
+#endif
+
+  vec3 F0 = vec3(0.04);
+  F0 = mix(F0, albedo, metallic);
+  vec3 Lo = vec3(0.0);
+
+  float NdotV = max(dot(N, view), 0.0);
+
+#ifdef LIGHT_COUNT
+  ShadowData shadows;
+  float shadow_kernel = 4.0 / 1536.0;
+  float shadowblur = shadow_kernel + shadow_kernel;
+  shadowblur = 0.0005 + 0.5 * shadowblur;
+  ShadowLighting(shadows, shadowblur);
+
+  for(int i = 0; i < LIGHT_COUNT; i++) {
+    // vec3 lightDir = lightPositions[i] - vWorldPos;
+    vec3 lightDir = lightDirections[i];
+    vec3 H = normalize(view + lightDir);
+    vec3 radiance = lightColors[i];
+    float NDF = DistributionGGX(N, H, roughness);
+    float G = GeometrySmith(N, view, lightDir, roughness);
+    vec3 F = fresnelSchlick(max(dot(H, view), 0.0), F0);
+
+    vec3 numerator = NDF * G * F;
+    float denominator = 4.0 * NdotV * max(dot(N, lightDir), 0.0) + 0.001;
+    vec3 specular = cavity * numerator / denominator;
+
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - metallic;
+
+    float NdotL = max(dot(N, lightDir), 0.0);
+
+    vec3 L = (kD * albedo / M_PI + specular) * radiance;
+
+#ifdef TRANSLUCENCY_TEX
+    vec3 translucency = Translucency(translucencyTex, view, N, lightDir, albedo * radiance);
+    L += translucency;
+#endif
+
+    L *= NdotL * shadows.val[i];
+    Lo += L;
+  }
+#endif
+  vec3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
+  vec3 kS = F;
+  vec3 kD = 1.0 - kS;
+  kD *= 1.0 - metallic;
+
+  vec3 irradiance = vec3(1.0, 1.0, 1.0);
+  vec3 diffuse = irradiance * albedo;
+
+#ifdef ENVIR_TEX
+  vec3 R = reflect(-view, N);
+  vec3 envir = environmentmap(R, (1.0 - roughness)).rgb;
+#else
+  vec3 envir = vec3(0.0, 0.0, 0.0);
+#endif
+  vec2 brdf = texture2D(uBRDF, vec2(NdotV, roughness)).rg;
+  vec3 specular = (envir * (F * brdf.x + brdf.y)) * cavity;
+
+  vec3 ambient = (kD * diffuse + specular) * ao;
+#ifdef SKIN
+  ambient *= 0.2;
+#endif
+  vec3 color = ambient + Lo;
+
+  color = color / (color + vec3(1.0));
+  color = pow(color, vec3(0.46226525728));
+  gl_FragColor = vec4(color, albedoTex.a);
 }`,
   },
 };

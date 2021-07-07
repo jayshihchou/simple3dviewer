@@ -131,6 +131,7 @@ export default class Renderable {
     }
 
     if (this.drawingMode === DrawingMode.Lines) {
+      gl.lineWidth(0.01);
       gl.drawArrays(gl.LINES, this.first, this.size);
     } else {
       gl.drawArrays(gl.TRIANGLES, this.first, this.size);

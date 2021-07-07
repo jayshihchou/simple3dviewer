@@ -114,6 +114,8 @@ export default class Material {
   }
 
   parseFromShader(shaderSrc) {
+    this.parameters = {};
+    this.pkeys = [];
     // console.log(shaderSrc.name);
     // console.log('vs');
     this.parseFromStr(shaderSrc.vs);

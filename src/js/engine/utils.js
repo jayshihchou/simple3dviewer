@@ -54,6 +54,21 @@ function mulPoint(mat, p) {
   return vec4.add(v0, v0, v3);
 }
 
+function flagContains(flags, flag) {
+  // eslint-disable-next-line no-bitwise
+  return (flags & flag) !== 0;
+}
+
+function flagAdd(flags, flag) {
+  // eslint-disable-next-line no-bitwise
+  return (flags | flag);
+}
+
+function flagRemove(flags, flag) {
+  // eslint-disable-next-line no-bitwise
+  return (flags & (~flag));
+}
+
 export {
   isMobile,
   setFrameDirty,
@@ -66,4 +81,7 @@ export {
   devicePixelRatio,
   inverseDevicePixelRatio,
   mulPoint,
+  flagContains,
+  flagAdd,
+  flagRemove,
 };

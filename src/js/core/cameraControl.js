@@ -109,7 +109,7 @@ export default class CameraControl {
       if (dy === undefined || Number.isNaN(dy)) dy = 0;
       const distSqr = dx * dx + dy * dy;
       if (this.lastTouchDistSqr !== undefined) {
-        this.OnMouseWheel((this.lastTouchDistSqr - distSqr) * timer.deltaTime * 0.0001);
+        this.OnMouseWheel(-(this.lastTouchDistSqr - distSqr) * timer.deltaTime * 0.0001);
       }
       this.lastTouchDistSqr = distSqr;
       return;
@@ -184,17 +184,21 @@ export default class CameraControl {
     this.distance_to_object = this.target_dist - 0.01;
     // console.log(this.camera);
     // console.log(`far: ${dist * 5.0}`);
-    if (this.camera.zFar < dist * 5.0) {
-      this.camera.zFar = dist * 5.0;
-      // console.log(`zFar: ${this.camera.zFar}`);
-    }
+    // if (this.camera.zFar < dist * 5.0) {
+    //   this.camera.zFar = dist * 5.0;
+    //   // console.log(`zFar: ${this.camera.zFar}`);
+    // }
+    this.camera.zFar = dist * 5.0;
+    // console.slog(`zFar: ${this.camera.zFar}`);
 
-    const close = clamp(Math.min(Math.min(allMin[0], allMin[1]), allMin[2]), 1e-4, 1.0) * 0.5;
+    const close = clamp(Math.min(Math.min(allMin[0], allMin[1]), allMin[2]), 0.001, 1.0);
     // console.log(`close: ${close}`);
-    if (this.camera.zNear > close) {
-      this.camera.zNear = close;
-      // console.log(`zFar: ${this.camera.zNear}`);
-    }
+    // if (this.camera.zNear > close) {
+    //   this.camera.zNear = close;
+    //   // console.log(`zFar: ${this.camera.zNear}`);
+    // }
+    this.camera.zNear = close;
+    // console.slog(`zNear: ${this.camera.zNear}`);
 
     this.camera.updateProjectionMatrix();
   }
