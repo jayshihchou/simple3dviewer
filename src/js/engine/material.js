@@ -36,8 +36,38 @@ function AddBlend() {
 
 const blendFunctions = [NoBlend, AlphaBlend, AddBlend];
 
+const CullingType = Object.freeze(
+  {
+    Back: 0,
+    Front: 1,
+    FrontAndBack: 2,
+    Off: 3,
+  },
+);
+
+function BackCulling() {
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+}
+
+function FrontCulling() {
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.FRONT);
+}
+
+function FrontAndBackCulling() {
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.FRONT_AND_BACK);
+}
+
+function OffCulling() {
+  gl.disable(gl.CULL_FACE);
+}
+
+const cullingFunctions = [BackCulling, FrontCulling, FrontAndBackCulling, OffCulling];
+
 export default class Material {
-  constructor(shaderName, blendType) {
+  constructor(shaderName, blendType, cullingType) {
     this.parameters = {};
     this.pkeys = [];
     this.ifdefines = [];
@@ -47,6 +77,8 @@ export default class Material {
     this.updateShader(shaderName);
     this.blendType = blendType || BlendType.NoBlend;
     this.blendFunction = blendFunctions[this.blendType];
+    this.cullingType = cullingType || CullingType.Back;
+    this.cullingFunction = cullingFunctions[this.cullingType];
   }
 
   get getShader() { return this.shader; }
@@ -409,8 +441,14 @@ export default class Material {
     GameNode.sortRenderingGroup();
   }
 
+  setCullingType(cullingType) {
+    this.cullingType = cullingType || CullingType.Back;
+    this.cullingFunction = cullingFunctions[this.cullingType];
+  }
+
   onRender() {
     this.blendFunction();
+    this.cullingFunction();
   }
 
   parseFromStr(text) {
@@ -523,4 +561,4 @@ export default class Material {
   }
 }
 
-export { Material, BlendType };
+export { Material, BlendType, CullingType };

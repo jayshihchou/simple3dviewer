@@ -131,8 +131,8 @@ export default class Camera {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
-    gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.BACK);
+    // gl.enable(gl.CULL_FACE);
+    // gl.cullFace(gl.BACK);
     // gl.disable(gl.CULL_FACE);
     nodeGroup.forEach((node) => {
       if (!node.ui) node.render(this, Light, viewMat, projMat, material);
@@ -154,8 +154,8 @@ export default class Camera {
     gl.disable(gl.DEPTH_TEST);
     // gl.enable(gl.BLEND);
     // gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.enable(gl.CULL_FACE);
-    gl.cullFace(gl.BACK);
+    // gl.enable(gl.CULL_FACE);
+    // gl.cullFace(gl.BACK);
     // gl.disable(gl.CULL_FACE);
     // ed rendering
     // var err;

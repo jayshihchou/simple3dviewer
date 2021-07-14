@@ -992,6 +992,7 @@ void main(void)
 
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(0.46226525728));
+  if (albedoTex.a < 0.001) discard;
   gl_FragColor = vec4(color, albedoTex.a);
 }`,
   },

@@ -25,8 +25,7 @@ export default class Hierarchy {
     };
     this.hierarchy.addWidget(this.addNodeButton);
     this.itemButtons = [];
-    this.renderingStatus = [];
-    this.shaderStatus = [];
+    this.nodeStatus = {};
 
     this.lastClicked = undefined;
     app.addEvent('PosToNode', this.PosToNode, this);
@@ -50,16 +49,17 @@ export default class Hierarchy {
     this.inspRenderingModelBtn.onClick = () => {
       if (this.currentIndex !== undefined && this.currentNode !== undefined) {
         const i = this.currentIndex;
-        if (!this.renderingStatus[i]) {
-          this.renderingStatus[i] = this.currentNode.renderable.material.blendType;
+        const nodeStatus = this.nodeStatus[i];
+        if (!nodeStatus.renderingStatus) {
+          nodeStatus.renderingStatus = this.currentNode.renderable.material.blendType;
         }
-        this.renderingStatus[i] += 1;
-        if (this.renderingStatus[i] === 4) {
-          this.renderingStatus[i] = 0;
+        nodeStatus.renderingStatus += 1;
+        if (nodeStatus.renderingStatus === 4) {
+          nodeStatus.renderingStatus = 0;
         }
-        this.currentNode.renderable.material.setBlendType(this.renderingStatus[i]);
+        this.currentNode.renderable.material.setBlendType(nodeStatus.renderingStatus);
         let typeStr;
-        switch (this.renderingStatus[i]) {
+        switch (nodeStatus.renderingStatus) {
           case 1:
             typeStr = 'Alpha';
             break;
@@ -74,6 +74,38 @@ export default class Hierarchy {
       }
     };
     this.inspector.addWidget(this.inspRenderingModelBtn);
+    this.inspChangeCulling = new Button(new Rect(0, 0, 300, 50));
+    this.inspChangeCulling.onClick = () => {
+      if (this.currentIndex !== undefined && this.currentNode !== undefined) {
+        const i = this.currentIndex;
+        const nodeStatus = this.nodeStatus[i];
+        if (!nodeStatus.CullingStatus) {
+          nodeStatus.CullingStatus = this.currentNode.renderable.material.cullingType;
+        }
+        nodeStatus.CullingStatus += 1;
+        if (nodeStatus.CullingStatus === 4) {
+          nodeStatus.CullingStatus = 0;
+        }
+        let cullingStr;
+        switch (nodeStatus.CullingStatus) {
+          case 1:
+            cullingStr = 'CullingMode: Front';
+            break;
+          case 2:
+            cullingStr = 'CullingMode: Front And Back';
+            break;
+          case 3:
+            cullingStr = 'CullingMode: Off';
+            break;
+          default:
+            cullingStr = 'CullingMode: Back';
+            break;
+        }
+        this.currentNode.renderable.material.setCullingType(nodeStatus.CullingStatus);
+        this.inspChangeCulling.setText(cullingStr);
+      }
+    };
+    this.inspector.addWidget(this.inspChangeCulling);
     this.inspScaleMin = 1e-3;
     this.inspScaleMax = 10.0;
     this.inspScaleText = new GameNode(new TextField().setText(`Scale[${this.inspScaleMin}, ${this.inspScaleMax}]: 1.0`).setTextColor([0.6, 0.6, 0.9, 1.0]), 'inspector_scale_text').renderable;
@@ -115,8 +147,7 @@ export default class Hierarchy {
         b.enabled = this.hierarchy.enabled;
         this.hierarchy.addWidget(b);
         this.itemButtons.push(b);
-        this.renderingStatus.push(nodes[i].renderable.material.blendType);
-        this.shaderStatus.push(0);
+        this.nodeStatus[i] = {};
       }
     }
     this.itemButtons.forEach((button, j) => {
@@ -151,31 +182,6 @@ export default class Hierarchy {
         this.currentIndex = i;
         this.currentNode = nodes[i];
         this.RefreshInspector();
-        // if (!this.renderingStatus[i]) {
-        //   this.renderingStatus[i] = 0;
-        // }
-        // this.renderingStatus[i] += 1;
-        // if (this.renderingStatus[i] === 4) {
-        //   this.renderingStatus[i] = 0;
-        // }
-        // nodes[i].renderable.enabled = this.renderingStatus[i] < 3;
-        // let typeStr = 'Disabled';
-        // if (nodes[i].renderable.enabled) {
-        //   nodes[i].renderable.material.setBlendType(this.renderingStatus[i]);
-        //   switch (this.renderingStatus[i]) {
-        //     case 1:
-        //       typeStr = 'Alpha';
-        //       break;
-        //     case 2:
-        //       typeStr = 'Add';
-        //       break;
-        //     default:
-        //       typeStr = 'No Blend';
-        //       break;
-        //   }
-        // }
-        // // console.log(button);
-        // button.setText(`${nodes[i].name} : ${typeStr}`);
         this.lastClicked = i;
         break;
       }
@@ -186,11 +192,12 @@ export default class Hierarchy {
     if (this.currentNode === undefined || this.currentIndex === undefined) return;
     this.inspector.title.setText(this.currentNode.name);
     this.inspEnableBtn.setText(`${this.currentNode.renderable.enabled ? 'enabled' : 'disabled'}`);
-    if (!this.renderingStatus[this.currentIndex]) {
-      this.renderingStatus[this.currentIndex] = this.currentNode.renderable.material.blendType;
+    const nodeStatus = this.nodeStatus[this.currentIndex];
+    if (!nodeStatus.renderingStatus) {
+      nodeStatus.renderingStatus = this.currentNode.renderable.material.blendType;
     }
     let typeStr = 'BlendMode : ';
-    switch (this.renderingStatus[this.currentIndex]) {
+    switch (nodeStatus.renderingStatus) {
       case 1:
         typeStr += 'Alpha';
         break;
@@ -203,6 +210,24 @@ export default class Hierarchy {
     }
     this.inspRenderingModelBtn.setText(typeStr);
     this.inspVertexInfoText.setText(`vertex : ${this.currentNode.renderable.meshVertexCount}, face : ${this.currentNode.renderable.meshFaceCount}`);
+
+    let cullingStr;
+    switch (nodeStatus.CullingStatus) {
+      case 1:
+        cullingStr = 'CullingMode: Front';
+        break;
+      case 2:
+        cullingStr = 'CullingMode: Front And Back';
+        break;
+      case 3:
+        cullingStr = 'CullingMode: Off';
+        break;
+      default:
+        cullingStr = 'CullingMode: Back';
+        break;
+    }
+    this.inspChangeCulling.setText(cullingStr);
+
     const scale = this.currentNode.transform.scale[0];
     this.inspScaleText.setText(`Scale[${this.inspScaleMin}, ${this.inspScaleMax}]:`);
     this.inspScaleText.setFieldText(`${scale.toFixed(2)}`);
