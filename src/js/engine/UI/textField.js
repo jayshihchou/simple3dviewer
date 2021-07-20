@@ -2,37 +2,52 @@ import { Widget } from './widget.js';
 import { inverseDevicePixelRatio, realScreenSize } from '../utils.js';
 import { input } from '../inputmanager.js';
 
+const TextFieldType = Object.freeze(
+  {
+    String: 0,
+    Integer: 1,
+    Float: 2,
+  },
+);
+
 const container = document.getElementById('container');
 export default class TextField extends Widget {
-  constructor() {
+  constructor(textFieldType = 0) {
     super(null);
+    this.textFieldType = textFieldType;
     this.enabledTag = true;
 
     this.comparer = [-1, -1];
 
     this.input = document.createElement('INPUT');
-    this.input.onchange = this.onInputText.bind(this);
+    this.input.onchange = this.OnInputText.bind(this);
     this.input.size = 10;
     this.div = document.createElement('div');
     this.textNode = document.createTextNode('');
+    this.textNodeDiv = document.createElement('span');
+    this.textNodeDiv.className = 'textNode_id';
+    this.textNodeDiv.style = 'white-space: pre;';
     this.div.className = 'text_id';
-    this.div.style = 'white-space: pre;';
+    // this.div.style = 'white-space: pre;';
     this.style = this.div.style;
     const halfWidth = this.rect.width * 0.4;
     this.style.left = `${Math.floor(this.rect.x * inverseDevicePixelRatio)}px`;
-    this.style.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}px`;
+    // this.style.width = `${Math.floor(this.rect.width * inverseDevicePixelRatio)}px`;
+    this.style.height = `${Math.floor(this.rect.height * inverseDevicePixelRatio)}px`;
     this.style.top = `${Math.floor(realScreenSize[1] - (this.rect.y + this.rect.height) * inverseDevicePixelRatio)}px`;
     this.style.fontSize = '20px';
     this.style.color = 'rgba(0.0, 0.0, 0.0, 1.0)';
     this.color = [0.0, 0.0, 0.0, 1.0];
     this.text = '';
+    this.textNodeStyle = this.textNodeDiv.style;
+    this.textNodeStyle.display = 'inline-block';
+    this.textNodeStyle.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}px`;
     this.inputStyle = this.input.style;
-    this.inputStyle.left = `${Math.floor((this.rect.x + halfWidth) * inverseDevicePixelRatio)}px`;
-    this.inputStyle.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}px`;
-    this.inputStyle.top = `${Math.floor(realScreenSize[1] - (this.rect.y + this.rect.height) * inverseDevicePixelRatio)}px`;
+    this.inputStyle.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}0px`;
     this.inputStyle.fontSize = '20px';
     this.inputStyle.color = 'rgba(255, 255, 255, 1.0)';
-    this.div.appendChild(this.textNode);
+    this.textNodeDiv.appendChild(this.textNode);
+    this.div.appendChild(this.textNodeDiv);
     this.div.appendChild(this.input);
 
     this.borders = [0, 0];
@@ -50,9 +65,10 @@ export default class TextField extends Widget {
     input.eventListeners.push(this);
     this.onInputText = undefined;
     this.onInputTextTargets = [];
+    this.floatFractionDigits = 2;
   }
 
-  onInputText() {
+  OnInputText() {
     const { value } = this.input;
     if (this.onInputText) {
       this.onInputText(this, value);
@@ -73,7 +89,17 @@ export default class TextField extends Widget {
   }
 
   setFieldText(text) {
-    this.input.value = text;
+    switch (this.textFieldType) {
+      case TextFieldType.Integer:
+        this.input.value = parseInt(text, 10);
+        break;
+      case TextFieldType.Float:
+        this.input.value = parseFloat(text).toFixed(this.floatFractionDigits);
+        break;
+      default:
+        this.input.value = text;
+        break;
+    }
   }
 
   setTextColor(col) {
@@ -95,11 +121,11 @@ export default class TextField extends Widget {
 
     const halfWidth = this.rect.width * 0.4;
     this.style.left = `${Math.floor(this.rect.x * inverseDevicePixelRatio)}px`;
-    this.style.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}px`;
+    // this.style.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}px`;
+    this.style.height = `${Math.floor(this.rect.height * inverseDevicePixelRatio)}px`;
     this.style.top = `${Math.floor(realScreenSize[1] - (this.rect.y + this.rect.height) * inverseDevicePixelRatio)}px`;
-    this.inputStyle.left = `${Math.floor((this.rect.x + halfWidth) * inverseDevicePixelRatio)}px`;
+    this.textNodeStyle.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}px`;
     this.inputStyle.width = `${Math.floor(halfWidth * inverseDevicePixelRatio)}px`;
-    this.inputStyle.top = `${Math.floor(realScreenSize[1] - (this.rect.y + this.rect.height) * inverseDevicePixelRatio)}px`;
   }
 
   // since we using html to draw text...
@@ -126,6 +152,30 @@ export default class TextField extends Widget {
       return true;
     }
     return false;
+  }
+
+  OnTouch(e) {
+    if (!this.enabledTag) return;
+    if (!this.pressing) return;
+    // not work for string.
+    if (this.textFieldType === TextFieldType.String) return;
+    if (e.x2 !== undefined && e.y2 !== undefined) return;
+    const { deltaX } = e;
+    if (deltaX !== 0) {
+      let { value } = this.input;
+      if (this.textFieldType === TextFieldType.Integer) {
+        value = parseInt(value, 10);
+        if (deltaX > 0) {
+          this.setFieldText(value + 1);
+        } else {
+          this.setFieldText(value - 1);
+        }
+      } else if (this.textFieldType === TextFieldType.Float) {
+        value = parseFloat(value);
+        this.setFieldText(value + deltaX * 0.01);
+      }
+      this.OnInputText();
+    }
   }
 
   OnTouchEnd(e) {
@@ -155,4 +205,4 @@ export default class TextField extends Widget {
   }
 }
 
-export { TextField };
+export { TextField, TextFieldType };

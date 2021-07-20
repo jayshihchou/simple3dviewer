@@ -7,7 +7,7 @@ import { Rect } from '../engine/UI/rect.js';
 import { UIContainer, AnchorType } from '../engine/UI/uicontainer.js';
 import { addOnStart } from './app.js';
 import { Slider } from '../engine/UI/slider.js';
-import { TextField } from '../engine/UI/textField.js';
+import { TextField, TextFieldType } from '../engine/UI/textField.js';
 
 export default class Hierarchy {
   constructor(a) {
@@ -108,13 +108,10 @@ export default class Hierarchy {
     this.inspector.addWidget(this.inspChangeCulling);
     this.inspScaleMin = 1e-3;
     this.inspScaleMax = 10.0;
-    this.inspScaleText = new GameNode(new TextField().setText(`Scale[${this.inspScaleMin}, ${this.inspScaleMax}]: 1.0`).setTextColor([0.6, 0.6, 0.9, 1.0]), 'inspector_scale_text').renderable;
+    this.inspScaleText = new GameNode(new TextField(TextFieldType.Float).setText('Scale: 1.0').setTextColor([0.6, 0.6, 0.9, 1.0]), 'inspector_scale_text').renderable;
     this.inspScaleText.rect = new Rect(0, 0, 300, 50);
     this.inspScaleText.onInputTextTargets.push(this);
     this.inspector.addWidget(this.inspScaleText);
-    this.inspScaleSlider = new Slider(new Rect(0, 0, 300, 50));
-    this.inspScaleSlider.onChangeTargets.push(this);
-    this.inspector.addWidget(this.inspScaleSlider);
     this.inspVertexInfoText = new GameNode(new Text().setText('').setTextColor([0.6, 0.6, 0.9, 1.0]), 'inspector_vertex_text').renderable;
     this.inspVertexInfoText.rect = new Rect(0, 0, 300, 50);
     // this.inspRenderingModelBtn = new Button(new Rect(0, 0, 300, 50));
@@ -229,11 +226,8 @@ export default class Hierarchy {
     this.inspChangeCulling.setText(cullingStr);
 
     const scale = this.currentNode.transform.scale[0];
-    this.inspScaleText.setText(`Scale[${this.inspScaleMin}, ${this.inspScaleMax}]:`);
+    this.inspScaleText.setText('Scale:');
     this.inspScaleText.setFieldText(`${scale.toFixed(2)}`);
-    const range = this.inspScaleMax - this.inspScaleMin;
-    const val = (scale - this.inspScaleMin) / range;
-    this.inspScaleSlider.setSliderValue(val);
     // this.inspector.enabled = !this.inspector.enabled;
     this.inspector.Refresh();
   }
@@ -266,17 +260,6 @@ export default class Hierarchy {
     if (e.key === 'h') {
       this.hierarchy.enabled = !this.hierarchy.enabled;
       this.inspector.enabled = this.inspectorEnable && this.hierarchy.enabled;
-    }
-  }
-
-  OnValue(slider, value) {
-    if (slider === this.inspScaleSlider) {
-      if (this.currentIndex !== undefined && this.currentNode !== undefined) {
-        const range = this.inspScaleMax - this.inspScaleMin;
-        const scale = this.inspScaleMin + range * value;
-        this.inspScaleText.setFieldText(`${scale.toFixed(2)}`);
-        this.currentNode.transform.scale = [scale, scale, scale];
-      }
     }
   }
 
