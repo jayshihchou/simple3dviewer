@@ -168,6 +168,119 @@ void main(void)
   gl_FragColor = vec4(col.rgb * vLighting, col.a);
 }`,
   },
+  uv: {
+    vs: `#pragma DEFINES
+attribute vec3 position;
+attribute vec2 texcoord;
+uniform mat4 viewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 projectionMatrix;
+
+#pragma UNIFORMS
+
+varying highp vec2 vTexcoord;
+
+void main(void)
+{
+  vec3 finalPos = position;
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
+  vTexcoord = texcoord;
+}`,
+    fs: `#pragma DEFINES
+
+#pragma UNIFORMS
+
+varying highp vec2 vTexcoord;
+void main(void)
+{
+  gl_FragColor = vec4(vTexcoord, 0.0, 1.0);
+}`,
+  },
+  normal: {
+    vs: `#pragma DEFINES
+attribute vec3 position;
+attribute vec3 normal;
+uniform mat4 viewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 projectionMatrix;
+
+#pragma UNIFORMS
+
+varying highp vec3 vNormal;
+
+void main(void)
+{
+  vec3 finalPos = position;
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
+  vNormal = normal;
+}`,
+    fs: `#pragma DEFINES
+
+#pragma UNIFORMS
+
+varying highp vec3 vNormal;
+void main(void)
+{
+  gl_FragColor = vec4(vNormal, 1.0);
+}`,
+  },
+  tangent: {
+    vs: `#pragma DEFINES
+attribute vec3 position;
+attribute vec3 tangent;
+uniform mat4 viewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 projectionMatrix;
+
+#pragma UNIFORMS
+
+varying highp vec3 vTangent;
+
+void main(void)
+{
+  vec3 finalPos = position;
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
+  vTangent = tangent * 0.5 + 0.5;
+}`,
+    fs: `#pragma DEFINES
+
+#pragma UNIFORMS
+
+varying highp vec3 vTangent;
+void main(void)
+{
+  gl_FragColor = vec4(vTangent, 1.0);
+}`,
+  },
+  texture: {
+    vs: `#pragma DEFINES
+attribute vec3 position;
+attribute vec2 texcoord;
+uniform mat4 viewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 projectionMatrix;
+
+#pragma UNIFORMS
+
+varying highp vec2 vTexcoord;
+
+void main(void)
+{
+  vec3 finalPos = position;
+  gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);
+  vTexcoord = texcoord;
+}`,
+    fs: `#pragma DEFINES
+
+uniform sampler2D uAlbedo;
+#pragma UNIFORMS
+
+varying highp vec2 vTexcoord;
+void main(void)
+{
+  gl_FragColor = texture2D(uAlbedo, vTexcoord);
+}`,
+  },
   sprite: {
     vs: `#pragma DEFINES
 attribute vec2 position;

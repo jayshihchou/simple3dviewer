@@ -73,6 +73,47 @@ export default class Hierarchy {
       }
     };
     this.inspector.addWidget(this.inspRenderingModelBtn);
+    this.inspChangeShaderBtn = new Button(new Rect(0, 0, 300, 50));
+    this.inspChangeShaderBtn.onClick = () => {
+      if (this.currentIndex !== undefined && this.currentNode !== undefined) {
+        const i = this.currentIndex;
+        const nodeStatus = this.nodeStatus[i];
+        if (!nodeStatus.shaderStatus) {
+          nodeStatus.shaderStatus = 0;
+        }
+        nodeStatus.shaderStatus += 1;
+        if (nodeStatus.shaderStatus === 5) {
+          nodeStatus.shaderStatus = 0;
+        }
+        let shaderStr;
+        let shaderName;
+        switch (nodeStatus.shaderStatus) {
+          case 1:
+            shaderStr = 'Shader: UV Test';
+            shaderName = 'uv';
+            break;
+          case 2:
+            shaderStr = 'Shader: Normal Test';
+            shaderName = 'normal';
+            break;
+          case 3:
+            shaderStr = 'Shader: Tangent Test';
+            shaderName = 'tangent';
+            break;
+          case 4:
+            shaderStr = 'Shader: Texture Test';
+            shaderName = 'texture';
+            break;
+          default:
+            shaderStr = 'Shader: PBR';
+            shaderName = 'pbr';
+            break;
+        }
+        this.currentNode.renderable.material.updateShader(shaderName);
+        this.inspChangeShaderBtn.setText(shaderStr);
+      }
+    };
+    this.inspector.addWidget(this.inspChangeShaderBtn);
     this.inspChangeCulling = new Button(new Rect(0, 0, 300, 50));
     this.inspChangeCulling.onClick = () => {
       if (this.currentIndex !== undefined && this.currentNode !== undefined) {
@@ -221,6 +262,25 @@ export default class Hierarchy {
         break;
     }
     this.inspRenderingModelBtn.setText(typeStr);
+    let shaderStr;
+    switch (nodeStatus.shaderStatus) {
+      case 1:
+        shaderStr = 'Shader: UV Test';
+        break;
+      case 2:
+        shaderStr = 'Shader: Normal Test';
+        break;
+      case 3:
+        shaderStr = 'Shader: Tangent Test';
+        break;
+      case 4:
+        shaderStr = 'Shader: Texture Test';
+        break;
+      default:
+        shaderStr = 'Shader: PBR';
+        break;
+    }
+    this.inspChangeShaderBtn.setText(shaderStr);
     this.inspVertexInfoText.setText(`vertex : ${this.currentNode.renderable.meshVertexCount}, face : ${this.currentNode.renderable.meshFaceCount}`);
 
     let cullingStr;
@@ -240,12 +300,10 @@ export default class Hierarchy {
     }
     this.inspChangeCulling.setText(cullingStr);
 
-    this.inspSkinBtn.setText(`${nodeStatus.SkinTag ? 'Skin Mode: Enabled' : 'Skin Mode: Disabled'}`);
-
     const scale = this.currentNode.transform.scale[0];
     this.inspScaleText.setText('Scale :');
     this.inspScaleText.setFieldText(`${scale.toFixed(2)}`);
-    // this.inspector.enabled = !this.inspector.enabled;
+    this.inspSkinBtn.setText(`${nodeStatus.SkinTag ? 'Skin Mode: Enabled' : 'Skin Mode: Disabled'}`);
     this.inspector.Refresh();
   }
 
