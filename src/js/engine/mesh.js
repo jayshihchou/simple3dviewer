@@ -251,7 +251,7 @@ function calcTangents(vertices, uvs, normals, tris, vertCount) {
     t1 = w2[1] - w1[1];
     t2 = w3[1] - w1[1];
 
-    r = 1.0 / (s1 * t2 - s2 * t1);
+    r = 1.0 / (s1 * t2 - s2 * t1 + 1e-10);
     sdir = vec3.set(vec3.create(), (t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r, (t2 * z1 - t1 * z2) * r);
     tdir = vec3.set(vec3.create(), (s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r, (s1 * z2 - s2 * z1) * r);
 
@@ -753,7 +753,7 @@ export default class Mesh extends Renderable {
       mesh.buffers.min, mesh.buffers.max,
     ];
     let normal = mesh.buffers.normal;
-    // material = start, count, materialIndex, materialName
+    // material = start, count, materialIndex
     if (normal.length === 0) normal = generateNormals(mesh.buffers.meshVertices, mesh.buffers.vertexIndex);
     this.meshVertexCount = mesh.buffers.meshVertices.length / 3;
     this.meshFaceCount = mesh.buffers.vertexIndex.length / 3;
