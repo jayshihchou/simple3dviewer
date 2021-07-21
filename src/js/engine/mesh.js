@@ -345,6 +345,7 @@ export default class Mesh extends Renderable {
     }
 
     this.meshVertexCount = vertices.length / 3;
+    this.meshFaceStart = undefined;
     this.meshFaceCount = vIndice.length / 3;
 
     const faces = [];
@@ -756,7 +757,13 @@ export default class Mesh extends Renderable {
     // material = start, count, materialIndex
     if (normal.length === 0) normal = generateNormals(mesh.buffers.meshVertices, mesh.buffers.vertexIndex);
     this.meshVertexCount = mesh.buffers.meshVertices.length / 3;
-    this.meshFaceCount = mesh.buffers.vertexIndex.length / 3;
+    if (material) {
+      this.meshFaceStart = material.start;
+      this.meshFaceCount = material.count;
+    } else {
+      this.meshFaceStart = undefined;
+      this.meshFaceCount = mesh.buffers.vertexIndex.length / 3;
+    }
 
     let [faceTangents, faceBitangents] = calcTangents(mesh.buffers.vertex, mesh.buffers.uvs[0], normal, mesh.buffers.vertexIndex, mesh.buffers.meshVertices.length);
 

@@ -281,7 +281,11 @@ export default class Hierarchy {
         break;
     }
     this.inspChangeShaderBtn.setText(shaderStr);
-    this.inspVertexInfoText.setText(`vertex : ${this.currentNode.renderable.meshVertexCount}, face : ${this.currentNode.renderable.meshFaceCount}`);
+    if (this.currentNode.renderable.meshFaceStart !== undefined) {
+      this.inspVertexInfoText.setText(`vertex : ${this.currentNode.renderable.meshVertexCount}, subface : ${this.currentNode.renderable.meshFaceCount}`);
+    } else {
+      this.inspVertexInfoText.setText(`vertex : ${this.currentNode.renderable.meshVertexCount}, face : ${this.currentNode.renderable.meshFaceCount}`);
+    }
 
     let cullingStr;
     switch (nodeStatus.CullingStatus) {
