@@ -245,6 +245,36 @@ class Texture2D extends Texture {
     return this;
   }
 
+  loadFromImage(image) {
+    const self = this;
+    gl.activeTexture(gl.TEXTURE0 + maxTexUnitCount - 1);
+    gl.bindTexture(gl.TEXTURE_2D, self.texture);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+    gl.texImage2D(
+      gl.TEXTURE_2D, self.level, self.internalFormat, self.srcFormat, self.srcType, image,
+    );
+
+    // eslint-disable-next-line no-param-reassign
+    self.width = image.width;
+    // eslint-disable-next-line no-param-reassign
+    self.height = image.height;
+
+    const genmipmap = self.mipmap && isPowerOf2(self.width) && isPowerOf2(self.height);
+    if (genmipmap) {
+      gl.generateMipmap(gl.TEXTURE_2D);
+    } else {
+      self.setParamType(TextureParamType.Clamp_To_Edge);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE0);
+    // eslint-disable-next-line no-param-reassign
+    self.image = image;
+    setFrameDirty();
+
+    return this;
+  }
+
   loadFromColorArray(arr, width, height, onloaded = undefined) {
   // Because images have to be download over the internet
   // they might take a moment until they are ready.

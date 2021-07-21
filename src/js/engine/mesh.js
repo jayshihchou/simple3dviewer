@@ -344,8 +344,8 @@ export default class Mesh extends Renderable {
       loadName = undefined;
     }
 
-    this.meshVertexCount = vertices.length;
-    this.meshFaceCount = vIndice.length;
+    this.meshVertexCount = vertices.length / 3;
+    this.meshFaceCount = vIndice.length / 3;
 
     const faces = [];
     let vID = -1;
@@ -744,7 +744,7 @@ export default class Mesh extends Renderable {
     return -1;
   }
 
-  LoadFBX(mesh, fbxTree) {
+  LoadFBX(mesh, fbxTree, material) {
     this.attributeDatas = [];
     this.wireframeAttributeDatas = [];
     this.size = 0;
@@ -753,9 +753,10 @@ export default class Mesh extends Renderable {
       mesh.buffers.min, mesh.buffers.max,
     ];
     let normal = mesh.buffers.normal;
+    // material = start, count, materialIndex, materialName
     if (normal.length === 0) normal = generateNormals(mesh.buffers.meshVertices, mesh.buffers.vertexIndex);
-    this.meshVertexCount = mesh.buffers.meshVertices.length;
-    this.meshFaceCount = mesh.buffers.vertexIndex.length;
+    this.meshVertexCount = mesh.buffers.meshVertices.length / 3;
+    this.meshFaceCount = mesh.buffers.vertexIndex.length / 3;
 
     let [faceTangents, faceBitangents] = calcTangents(mesh.buffers.vertex, mesh.buffers.uvs[0], normal, mesh.buffers.vertexIndex, mesh.buffers.meshVertices.length);
 
@@ -768,8 +769,9 @@ export default class Mesh extends Renderable {
     const containsUV = mesh.buffers.uvs.length > 0 && mesh.buffers.uvs[0].length > 0;
 
     const faces = [];
-    let imax = mesh.buffers.vertexIndex.length;
-    for (let i = 0; i < imax; i += 1) {
+    let i = material ? material.start : 0;
+    let imax = material ? i + material.count : mesh.buffers.vertexIndex.length;
+    for (; i < imax; i += 1) {
       this.setFace(
         faces,
         mesh.buffers.vertexIndex[i],
@@ -847,7 +849,7 @@ export default class Mesh extends Renderable {
     const wireframeFaces = [];
     imax /= 3;
     // console.log(mesh.buffers.vertexIndex);
-    for (let i = 0; i < imax; i += 1) {
+    for (i = 0; i < imax; i += 1) {
       addWireLines(
         mesh.buffers.vertexIndex[i * 3],
         mesh.buffers.vertexIndex[i * 3 + 1],
@@ -858,7 +860,8 @@ export default class Mesh extends Renderable {
     }
 
     imax = wireframeIndices.length;
-    for (let i = 0, vID = 0; i < imax; i += 1) {
+    let vID;
+    for (i = 0, vID = 0; i < imax; i += 1) {
       vID = wireframeIndices[i];
       this.setWireframeFace(
         wireframeFaces,
@@ -884,7 +887,7 @@ export default class Mesh extends Renderable {
       this.blendWeights = new Float32Array(this.blendShapeSize);
       this.verticeSize = mesh.buffers.meshVertices.length;
       this.blendShapeNames = [];
-      for (let i = 0; i < this.blendShapeSize; i += 1) {
+      for (i = 0; i < this.blendShapeSize; i += 1) {
         this.blendShapeNames.push(rawTargets[i].name);
       }
       const texSize = findBestTextureSize(this.verticeSize * this.blendShapeSize);

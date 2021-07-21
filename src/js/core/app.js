@@ -440,27 +440,51 @@ export default class Application {
           meshes.push(value);
         }
       });
+      // console.log(fbxTree);
+      // console.log(materialNames);
       // console.log(meshes);
 
-      if (meshes.length > 0) {
-        nodeTar.renderable.LoadFBX(meshes[0], fbxTree);
-        const t = meshes[0].transform;
-        if (('name' in t) && t.name) nodeTar.name = t.name;
-        if ('euler' in t) nodeTar.transform.euler = t.euler;
-        if ('scale' in t) nodeTar.transform.scale = t.scale;
-        if ('position' in t) nodeTar.transform.position = t.position;
-      }
-      if (meshes.length > 1) {
-        for (let i = 1; i < meshes.length; i += 1) {
-          const node = self.GetNextNode();
-          node.renderable.LoadFBX(meshes[i], fbxTree);
-          const t = meshes[i].transform;
+      meshes.forEach((mesh, i) => {
+        if (mesh.materialData.length > 0) {
+          mesh.materialData.forEach((material, j) => {
+            const node = (i === 0 && j === 0) ? nodeTar : self.GetNextNode();
+            node.renderable.LoadFBX(mesh, fbxTree, material);
+            const t = mesh.transform;
+            if (('name' in t) && t.name) node.name = `${t.name} : ${mesh.materials[material.materialIndex]}`;
+            if ('euler' in t) node.transform.euler = t.euler;
+            if ('scale' in t) node.transform.scale = t.scale;
+            if ('position' in t) node.transform.position = t.position;
+          });
+        } else {
+          const node = i === 0 ? nodeTar : self.GetNextNode();
+          node.renderable.LoadFBX(mesh, fbxTree);
+          const t = mesh.transform;
           if (('name' in t) && t.name) node.name = t.name;
           if ('euler' in t) node.transform.euler = t.euler;
           if ('scale' in t) node.transform.scale = t.scale;
           if ('position' in t) node.transform.position = t.position;
         }
-      }
+      });
+
+      // if (meshes.length > 0) {
+      //   nodeTar.renderable.LoadFBX(meshes[0], fbxTree);
+      //   const t = meshes[0].transform;
+      //   if (('name' in t) && t.name) nodeTar.name = t.name;
+      //   if ('euler' in t) nodeTar.transform.euler = t.euler;
+      //   if ('scale' in t) nodeTar.transform.scale = t.scale;
+      //   if ('position' in t) nodeTar.transform.position = t.position;
+      // }
+      // if (meshes.length > 1) {
+      //   for (let i = 1; i < meshes.length; i += 1) {
+      //     const node = self.GetNextNode();
+      //     node.renderable.LoadFBX(meshes[i], fbxTree);
+      //     const t = meshes[i].transform;
+      //     if (('name' in t) && t.name) node.name = t.name;
+      //     if ('euler' in t) node.transform.euler = t.euler;
+      //     if ('scale' in t) node.transform.scale = t.scale;
+      //     if ('position' in t) node.transform.position = t.position;
+      //   }
+      // }
       self.triggerEvent('OnLoadMesh', [self.nodes]);
     }, token);
   }

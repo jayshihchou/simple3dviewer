@@ -87,10 +87,10 @@ const fbxloader = {};
 
             connections = this.parseConnections();
             // console.log(connections);
-
+            const materials = this.parseMaterials();
             var deformers = this.parseDeformers();
             // console.log(deformers);
-            var geometryMap = new GeometryParser().parse(deformers);
+            var geometryMap = new GeometryParser().parse(deformers, materials);
             // console.log(geometryMap);
             return geometryMap;
 
@@ -234,6 +234,47 @@ const fbxloader = {};
             return rawMorphTargets;
 
         },
+
+        parseMaterials: function () {
+
+            const materialMap = new Map();
+
+            if ('Material' in fbxTree.Objects) {
+
+                const materialNodes = fbxTree.Objects.Material;
+
+                for (const nodeID in materialNodes) {
+
+                    const material = this.parseMaterial(materialNodes[nodeID]);
+                    if (material !== null) materialMap.set(parseInt(nodeID), material);
+
+                }
+
+            }
+
+            return materialMap;
+
+        },
+
+        parseMaterial: function (materialNode) {
+
+            const ID = materialNode.id;
+            const name = materialNode.attrName;
+            let type = materialNode.ShadingModel; // Case where FBX wraps shading model in property object.
+
+            if (typeof type === 'object') {
+
+                type = type.value;
+
+            } // Ignore unused materials which don't have any connections.
+
+
+            if (!connections.has(ID)) return null;
+            return {
+                name: name
+            };
+
+        },
     };
 
     // parse Geometry data from FBXTree and return map of BufferGeometries
@@ -244,9 +285,23 @@ const fbxloader = {};
         constructor: GeometryParser,
 
         // Parse nodes in FBXTree.Objects.Geometry
-        parse: function (deformers) {
+        parse: function (deformers, materials) {
+
+            var matRelationships = {};
+            materials.forEach((mat, key) => {
+                var name = mat.name;
+                var relationships = connections.get(key);
+                // console.log(relationships.parents);
+                relationships.parents.forEach((p) => {
+                    if (!(p.ID in matRelationships)) matRelationships[p.ID] = [];
+                    matRelationships[p.ID].push(name);
+                    // console.log(`${p.ID} ======== `);
+                    // console.log(connections.get(p.ID));
+                });
+            });
 
             var geometryMap = new Map();
+            // console.log(connections);
 
             if ('Geometry' in fbxTree.Objects) {
 
@@ -255,7 +310,7 @@ const fbxloader = {};
                 for (var nodeID in geoNodes) {
 
                     var relationships = connections.get(parseInt(nodeID));
-                    var geo = this.parseGeometry(relationships, geoNodes[nodeID], deformers);
+                    var geo = this.parseGeometry(relationships, geoNodes[nodeID], deformers, matRelationships);
 
                     geometryMap.set(parseInt(nodeID), geo);
 
@@ -264,17 +319,53 @@ const fbxloader = {};
             }
             // console.log(fbxTree);
             // console.log(geometryMap);
+            if (materials) {
+                const modelNodes = fbxTree.Objects.Model;
+                let geometry;
+                for (const nodeID in modelNodes) {
+                    const id = parseInt( nodeID );
+                    const relationships = connections.get(id);
+                    relationships.children.forEach(function (child) {
+                        if (geometryMap.has(child.ID)) {
+                            geometry = geometryMap.get(child.ID);
+                        }
+                        if (materials.has(child.ID)) {
+                            if (!geometry.materials) geometry.materials = [];
+                            geometry.materials.push(materials.get(child.ID).name);
+                            // console.log(child.ID);
+                            // console.log(geometry);
+                        }
+                    });
+                }
+                // console.log('===================== fbxTree');
+                // console.log(fbxTree.Objects.Model);
+                // console.log('===================== mat');
+                // materials.forEach((mat, key) => {
+                //     var name = mat.name;
+                //     var relationships = connections.get(key);
+                //     console.log(relationships);
+                //     relationships.parents.forEach((p) => {
+                //         // console.log(p.ID);
+                //         console.log(geometryMap.get(p.ID));
+                //     });
+                // });
+                // console.log('===================== getmap');
+                // console.log(geometryMap);
+                // console.log('=====================');
+                // geometryMap.set('materialNames', material);
+            }
+            // console.log(geometryMap);
 
             return geometryMap;
 
         },
 
         // Parse single node in FBXTree.Objects.Geometry
-        parseGeometry: function (relationships, geoNode, deformers) {
+        parseGeometry: function (relationships, geoNode, deformers, matRelationships) {
             // console.log(geoNode);
             switch (geoNode.attrType) {
                 case 'Mesh':
-                    return this.parseMeshGeometry(relationships, geoNode, deformers);
+                    return this.parseMeshGeometry(relationships, geoNode, deformers, matRelationships);
                 case 'Shape':
                     return this.genShape(geoNode);
             }
@@ -282,18 +373,20 @@ const fbxloader = {};
 
 
         // Parse single node mesh geometry in FBXTree.Objects.Geometry
-        parseMeshGeometry: function (relationships, geoNode, deformers) {
+        parseMeshGeometry: function (relationships, geoNode, deformers, matRelationships) {
             // console.log(relationships);
             var morphTargets = [];
+            var matnames;
 
             var modelNodes = relationships.parents.map(function (parent) {
-
                 return fbxTree.Objects.Model[parent.ID];
 
             });
 
             // don't create geometry if it is not associated with any models
             if (modelNodes.length === 0) return;
+
+            // console.log(relationships.children);
 
             relationships.children.forEach(function (child) {
 
@@ -304,6 +397,8 @@ const fbxloader = {};
                 }
 
             });
+
+            // console.log(matnames);
 
             // Assume one model and get the preRotation from that
             // if there is more than one model associated with the geometry this may cause problems
@@ -375,6 +470,7 @@ const fbxloader = {};
             // console.log(geoNode);
 
             var geoInfo = this.parseGeoNode(geoNode);
+            // console.log(geoInfo);
 
             if ('pivot' in preTransform) {
                 let rp = preTransform.pivot;
@@ -388,10 +484,69 @@ const fbxloader = {};
             var buffers = this.genBuffers(geoInfo);
             buffers.meshVertices = geoInfo.vertexPositions;
             // console.log(preTransform);
+            const matData = [];
+
+            if (geoInfo.material && geoInfo.material.mappingType !== 'AllSame') {
+
+                // Convert the material indices of each vertex into rendering groups on the geometry.
+                var prevMaterialIndex = buffers.materialIndex[0];
+                var startIndex = 0;
+
+                buffers.materialIndex.forEach(function (currentIndex, i) {
+
+                    if (currentIndex !== prevMaterialIndex) {
+
+                        matData.push({
+                            start: startIndex,
+                            count: i - startIndex,
+                            materialIndex: prevMaterialIndex,
+                        })
+                        // geo.addGroup(startIndex, i - startIndex, prevMaterialIndex);
+
+                        prevMaterialIndex = currentIndex;
+                        startIndex = i;
+
+                    }
+
+                });
+
+                // the loop above doesn't add the last group, do that here.
+                if (matData.length > 0) {
+
+                    var lastGroup = matData[matData.length - 1];
+                    var lastIndex = lastGroup.start + lastGroup.count;
+
+                    if (lastIndex !== buffers.materialIndex.length) {
+
+                        // geo.addGroup(lastIndex, buffers.materialIndex.length - lastIndex, prevMaterialIndex);
+                        matData.push({
+                            start: lastIndex,
+                            count: buffers.materialIndex.length - lastIndex,
+                            materialIndex: prevMaterialIndex,
+                        });
+
+                    }
+
+                } else {
+                    // geo.addGroup(0, buffers.materialIndex.length, buffers.materialIndex[0]);
+                    matData.push({
+                        start: 0,
+                        count: buffers.materialIndex.length,
+                        materialIndex: buffers.materialIndex[0],
+                    });
+                }
+
+            }
+
+            // console.log(matData);
+
             return {
+                id: geoNode.id,
                 buffers: buffers,
                 morphTargets: morphTargets,
                 transform: preTransform,
+                materialData: matData,
+                
             };
 
             // var positionAttribute = new THREE.Float32BufferAttribute(buffers.vertex, 3);
@@ -433,49 +588,6 @@ const fbxloader = {};
 
             // });
 
-            // if (geoInfo.material && geoInfo.material.mappingType !== 'AllSame') {
-
-            //     // Convert the material indices of each vertex into rendering groups on the geometry.
-            //     var prevMaterialIndex = buffers.materialIndex[0];
-            //     var startIndex = 0;
-
-            //     buffers.materialIndex.forEach(function (currentIndex, i) {
-
-            //         if (currentIndex !== prevMaterialIndex) {
-
-            //             geo.addGroup(startIndex, i - startIndex, prevMaterialIndex);
-
-            //             prevMaterialIndex = currentIndex;
-            //             startIndex = i;
-
-            //         }
-
-            //     });
-
-            //     // the loop above doesn't add the last group, do that here.
-            //     if (geo.groups.length > 0) {
-
-            //         var lastGroup = geo.groups[geo.groups.length - 1];
-            //         var lastIndex = lastGroup.start + lastGroup.count;
-
-            //         if (lastIndex !== buffers.materialIndex.length) {
-
-            //             geo.addGroup(lastIndex, buffers.materialIndex.length - lastIndex, prevMaterialIndex);
-
-            //         }
-
-            //     }
-
-            //     // case where there are multiple materials but the whole geometry is only
-            //     // using one of them
-            //     if (geo.groups.length === 0) {
-
-            //         geo.addGroup(0, buffers.materialIndex.length, buffers.materialIndex[0]);
-
-            //     }
-
-            // }
-
             // this.addMorphTargets(geo, geoNode, morphTargets, preTransform);
 
             // return geo;
@@ -495,11 +607,11 @@ const fbxloader = {};
 
             }
 
-            // if (geoNode.LayerElementMaterial) {
+            if (geoNode.LayerElementMaterial) {
 
-            //     geoInfo.material = this.parseMaterialIndices(geoNode.LayerElementMaterial[0]);
+                geoInfo.material = this.parseMaterialIndices(geoNode.LayerElementMaterial[0]);
 
-            // }
+            }
 
             if (geoNode.LayerElementNormal) {
 
@@ -692,7 +804,7 @@ const fbxloader = {};
                 }
 
                 if (geoInfo.material && geoInfo.material.mappingType !== 'AllSame') {
-
+                    // console.log(geoInfo.material);
                     var materialIndex = getData(polygonVertexIndex, polygonIndex, vertexIndex, geoInfo.material)[0];
 
                 }
@@ -1018,6 +1130,45 @@ const fbxloader = {};
             };
 
         },
+
+        parseMaterialIndices(MaterialNode) {
+
+            const mappingType = MaterialNode.MappingInformationType;
+            const referenceType = MaterialNode.ReferenceInformationType;
+
+            if (mappingType === 'NoMappingInformation') {
+
+                return {
+                    dataSize: 1,
+                    buffer: [0],
+                    indices: [0],
+                    mappingType: 'AllSame',
+                    referenceType: referenceType
+                };
+
+            }
+
+            const materialIndexBuffer = MaterialNode.Materials.a; // Since materials are stored as indices, there's a bit of a mismatch between FBX and what
+            // we expect.So we create an intermediate buffer that points to the index in the buffer,
+            // for conforming with the other functions we've written for other data.
+
+            const materialIndices = [];
+
+            for (let i = 0; i < materialIndexBuffer.length; ++i) {
+
+                materialIndices.push(i);
+
+            }
+
+            return {
+                dataSize: 1,
+                buffer: materialIndexBuffer,
+                indices: materialIndices,
+                mappingType: mappingType,
+                referenceType: referenceType
+            };
+
+        }, // Generate a NurbGeometry from a node in FBXTree.Objects.Geometry
 
         genShape: function (shapeNode) {
             var vertices = shapeNode.Vertices.a;
