@@ -308,7 +308,7 @@ export default class Mesh extends Renderable {
   constructor(shaderName, fileData) {
     super(new Material(shaderName));
 
-    if (fileData === undefined) return undefined;
+    // if (fileData === undefined) return undefined;
 
     this.size = 0;
     this.wireframe_size = 0;
@@ -318,7 +318,7 @@ export default class Mesh extends Renderable {
     this.blendVertexTexture = undefined;
     this.shaderName = shaderName;
 
-    this.LoadObj(fileData);
+    if (fileData !== undefined) this.LoadObj(fileData);
     return this;
   }
 
@@ -328,8 +328,8 @@ export default class Mesh extends Renderable {
     this.wireframe_size = 0;
     this.aabb = mesh.aabb;
     const { vertices } = mesh;
-    const { normals } = mesh;
-    const { uvs } = mesh;
+    // const { normals } = mesh;
+    // const { uvs } = mesh;
     const { vertexColors } = mesh;
     const vIndice = mesh.faces;
     const tIndice = mesh.uv_faces;
@@ -338,8 +338,9 @@ export default class Mesh extends Renderable {
     const { faceVertices } = mesh;
     const { faceUVs } = mesh;
     const { faceNormals } = mesh;
-    let { faceTangents } = mesh;
-    let { faceBitangents } = mesh;
+    const { faceTangents } = mesh;
+    const { faceBitangents } = mesh;
+    // const { faceHairTangents } = mesh;
     if (loadName && (!meshDict || Object.keys(meshDict).length === 0 || !(loadName in meshDict))) {
       loadName = undefined;
     }
@@ -350,11 +351,6 @@ export default class Mesh extends Renderable {
 
     const faces = [];
     let vID = -1;
-    let t0;
-    let t1;
-    let n0;
-    let n1;
-    let n2;
     const wireframeMap = {};
     const wireframeIndices = [];
     const wireframeFaces = [];
@@ -401,50 +397,38 @@ export default class Mesh extends Renderable {
     // }
     // console.log(lines);
     // DebugDraw.get()?.addLines(lines, lineSize, [0.0, 0.0, 1.0, 1.0]);
-
+    let tangents = [];
+    let bitangents = [];
     if (!faceTangents || !faceBitangents) {
-      [faceTangents, faceBitangents] = calcTangents(faceVertices, faceUVs, faceNormals, vIndice, vertices.length);
+      [tangents, bitangents] = calcTangents(faceVertices, faceUVs, faceNormals, vIndice, vertices.length);
     }
 
-    const containsTangents = faceTangents.length > 0 && faceBitangents.length > 0;
+    const containsTangents = tangents.length > 0 && bitangents.length > 0;
     const containsColors = vertexColors.length > 0;
     const containsNormal = nIndice.length > 0;
     const containsUV = tIndice.length > 0;
 
     for (i = ist; i < imax; i += 1) {
       vID = vIndice[i];
-      if (containsUV) {
-        t0 = uvs[tIndice[i] * 2];
-        t1 = uvs[(tIndice[i] * 2) + 1];
-      } else {
-        t0 = undefined;
-        t1 = undefined;
-      }
-      if (containsNormal) {
-        n0 = normals[(nIndice[i] * 3)];
-        n1 = normals[(nIndice[i] * 3) + 1];
-        n2 = normals[(nIndice[i] * 3) + 2];
-      } else {
-        n0 = undefined;
-        n1 = undefined;
-        n2 = undefined;
-      }
       this.setFace(faces,
         vID,
         vertices[vID * 3],
         vertices[(vID * 3) + 1],
         vertices[(vID * 3) + 2],
-        t0,
-        t1,
-        n0,
-        n1,
-        n2,
-        faceTangents[vID * 3],
-        faceTangents[vID * 3 + 1],
-        faceTangents[vID * 3 + 2],
-        faceBitangents[vID * 3],
-        faceBitangents[vID * 3 + 1],
-        faceBitangents[vID * 3 + 2],
+        faceUVs[i * 2],
+        faceUVs[i * 2 + 1],
+        faceNormals[i * 3],
+        faceNormals[i * 3 + 1],
+        faceNormals[i * 3 + 2],
+        tangents[vID * 3],
+        tangents[vID * 3 + 1],
+        tangents[vID * 3 + 2],
+        bitangents[vID * 3],
+        bitangents[vID * 3 + 1],
+        bitangents[vID * 3 + 2],
+        // faceHairTangents[i * 3],
+        // faceHairTangents[i * 3 + 1],
+        // faceHairTangents[i * 3 + 2],
         vertexColors[vID * 3],
         vertexColors[vID * 3 + 1],
         vertexColors[vID * 3 + 2]);
@@ -460,8 +444,10 @@ export default class Mesh extends Renderable {
     if (containsNormal) stride += 3;
     if (containsUV) stride += 2;
     if (containsTangents) stride += 6;
+    // if (faceHairTangents.length > 0) stride += 3;
 
     let size = 3;
+    this.attributeDatas = [];
     this.attributeDatas.push({
       name: 'position', size, offset, stride,
     });
@@ -502,6 +488,14 @@ export default class Mesh extends Renderable {
         offset += size;
       }
 
+      // if (faceHairTangents.length > 0) {
+      //   size = 3;
+      //   this.attributeDatas.push({
+      //     name: 'hair_tangent', size, offset, stride,
+      //   });
+      //   offset += size;
+      // }
+
       if (containsColors) {
         size = 3;
         this.attributeDatas.push({
@@ -509,6 +503,7 @@ export default class Mesh extends Renderable {
         });
         offset += size;
       }
+      this.drawingMode = DrawingMode.Normal;
     } else {
       size = 3;
       this.attributeDatas.push({
@@ -535,6 +530,7 @@ export default class Mesh extends Renderable {
         vID,
       );
     }
+    this.wireframeAttributeDatas = [];
     this.wireframeAttributeDatas.push({
       name: 'position', size: 3, offset: 0, stride: 4,
     });
@@ -546,6 +542,10 @@ export default class Mesh extends Renderable {
     //     // this.material.setUniformData('uAlbedo', getDefaultTextures()["black"]);
     // }
     // console.log(this.material);
+    if (this.shaderName !== this.material.shaderName) {
+      this.material = new Material(this.shaderName);
+      this.material.setBlendType(BlendType.NoBlend);
+    }
     return this;
   }
 
@@ -565,7 +565,7 @@ export default class Mesh extends Renderable {
     this.wireframe_size = 0;
     this.aabb = aabb;
     // console.log(aabb);
-
+    this.attributeDatas = [];
     this.attributeDatas.push({
       name: 'position', size: 3, offset: 0, stride: 6,
     });
@@ -582,7 +582,7 @@ export default class Mesh extends Renderable {
     return this;
   }
 
-  setFace(faces, id, x, y, z, tx, ty, nx, ny, nz, tex, tey, tez, bix, biy, biz, cx, cy, cz) {
+  setFace(faces, id, x, y, z, tx, ty, nx, ny, nz, tax, tay, taz, bix, biy, biz, cx, cy, cz) {
     faces.push(parseFloat(x));
     faces.push(parseFloat(y));
     faces.push(parseFloat(z));
@@ -601,15 +601,21 @@ export default class Mesh extends Renderable {
       faces.push(parseFloat(nz));
     }
 
-    if (tex !== undefined && tey !== undefined && tez !== undefined && bix !== undefined && biy !== undefined && biz !== undefined) {
-      faces.push(parseFloat(tex));
-      faces.push(parseFloat(tey));
-      faces.push(parseFloat(tez));
+    if (tax !== undefined && tay !== undefined && taz !== undefined && bix !== undefined && biy !== undefined && biz !== undefined) {
+      faces.push(parseFloat(tax));
+      faces.push(parseFloat(tay));
+      faces.push(parseFloat(taz));
 
       faces.push(parseFloat(bix));
       faces.push(parseFloat(biy));
       faces.push(parseFloat(biz));
     }
+
+    // if (hairtx !== undefined && hairty !== undefined && hairtz !== undefined) {
+    //   faces.push(parseFloat(hairtx));
+    //   faces.push(parseFloat(hairty));
+    //   faces.push(parseFloat(hairtz));
+    // }
 
     if (cx !== undefined && cy !== undefined && cz !== undefined) {
       const checker = parseFloat(cx);
@@ -787,6 +793,7 @@ export default class Mesh extends Renderable {
         normal[i * 3], normal[i * 3 + 1], normal[i * 3 + 2],
         faceTangents[i * 3], faceTangents[i * 3 + 1], faceTangents[i * 3 + 2],
         faceBitangents[i * 3], faceBitangents[i * 3 + 1], faceBitangents[i * 3 + 2],
+        // undefined, undefined, undefined,
         mesh.buffers.colors[i * 3], mesh.buffers.colors[i * 3 + 1], mesh.buffers.colors[i * 3 + 2],
       );
     }

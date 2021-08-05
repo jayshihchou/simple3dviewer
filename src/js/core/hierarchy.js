@@ -7,6 +7,7 @@ import { Rect } from '../engine/UI/rect.js';
 import { UIContainer, AnchorType } from '../engine/UI/uicontainer.js';
 import { addOnStart } from './app.js';
 import { TextField, TextFieldType } from '../engine/UI/textField.js';
+import { getDefaultTextures } from '../engine/texture.js';
 
 export default class Hierarchy {
   constructor(a) {
@@ -114,6 +115,65 @@ export default class Hierarchy {
       }
     };
     this.inspector.addWidget(this.inspChangeShaderBtn);
+
+    this.inspChangeColor = new Button(new Rect(0, 0, 300, 50));
+    this.inspChangeColor.onClick = () => {
+      if (this.currentIndex !== undefined && this.currentNode !== undefined) {
+        const nodeStatus = this.nodeStatus[this.currentIndex];
+        if (!nodeStatus.colorStatus) {
+          nodeStatus.colorStatus = 0;
+          nodeStatus.cachedTexture = this.currentNode.renderable.material.getData('uAlbedo');
+        }
+        nodeStatus.colorStatus += 1;
+        if (nodeStatus.colorStatus === 9) {
+          nodeStatus.colorStatus = 0;
+        }
+        let tex;
+        let colorName;
+        switch (nodeStatus.colorStatus) {
+          case 1:
+            tex = getDefaultTextures().white;
+            colorName = 'white';
+            break;
+          case 2:
+            tex = getDefaultTextures().red;
+            colorName = 'red';
+            break;
+          case 3:
+            tex = getDefaultTextures().green;
+            colorName = 'green';
+            break;
+          case 4:
+            tex = getDefaultTextures().blue;
+            colorName = 'blue';
+            break;
+          case 5:
+            tex = getDefaultTextures().yellow;
+            colorName = 'yellow';
+            break;
+          case 6:
+            tex = getDefaultTextures().cyan;
+            colorName = 'cyan';
+            break;
+          case 7:
+            tex = getDefaultTextures().magenta;
+            colorName = 'magenta';
+            break;
+          case 8:
+            tex = getDefaultTextures().black;
+            colorName = 'black';
+            break;
+          default:
+            tex = nodeStatus.cachedTexture;
+            colorName = 'texture';
+            break;
+        }
+        this.currentNode.renderable.material.setUniformData('uAlbedo', tex);
+        this.inspChangeColor.setText(colorName);
+      }
+    };
+    this.inspector.addWidget(this.inspChangeColor);
+
     this.inspChangeCulling = new Button(new Rect(0, 0, 300, 50));
     this.inspChangeCulling.onClick = () => {
       if (this.currentIndex !== undefined && this.currentNode !== undefined) {
@@ -281,6 +341,25 @@ export default class Hierarchy {
         break;
     }
     this.inspChangeShaderBtn.setText(shaderStr);
+    let colorName;
+    switch (nodeStatus.colorStatus) {
+      case 1:
+        colorName = 'white';
+        break;
+      case 2:
+        colorName = 'red';
+        break;
+      case 3:
+        colorName = 'green';
+        break;
+      case 4:
+        colorName = 'blue';
+        break;
+      default:
+        colorName = 'texture';
+        break;
+    }
+    this.inspChangeColor.setText(colorName);
     if (this.currentNode.renderable.meshFaceStart !== undefined) {
       this.inspVertexInfoText.setText(`vertex : ${this.currentNode.renderable.meshVertexCount}, subface : ${this.currentNode.renderable.meshFaceCount}`);
     } else {

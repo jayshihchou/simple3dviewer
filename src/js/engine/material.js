@@ -293,6 +293,10 @@ export default class Material {
     this.updateShader();
   }
 
+  getData(key) {
+    return this.parameters[key].data;
+  }
+
   createParameter(key) {
     const param = this.parameters[key];
     switch (param.type) {

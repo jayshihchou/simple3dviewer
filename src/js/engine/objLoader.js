@@ -252,6 +252,11 @@ export default function ObjLoader(fileData) {
     faceNormals[i * 3 + 2] = normals[(vID * 3) + 2];
   }
 
+  faceUVs.forEach((v, index, arr) => {
+    // eslint-disable-next-line no-param-reassign
+    if (v === undefined) arr[index] = 0;
+  });
+
   const aabb = [];
   aabb[0] = [minX, minY, minZ];
   aabb[1] = [maxX, maxY, maxZ];

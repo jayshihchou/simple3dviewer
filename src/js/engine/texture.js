@@ -369,10 +369,16 @@ function getDefaultTextures() {
         new Uint8Array([0, 0, 0, 255])),
       red: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([255, 0, 0, 255])),
-      green: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1,
+      green: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([0, 255, 0, 255])),
       blue: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
         new Uint8Array([0, 0, 255, 255])),
+      yellow: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
+        new Uint8Array([255, 255, 0, 255])),
+      cyan: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
+        new Uint8Array([0, 255, 255, 255])),
+      magenta: new Texture2D(gl.RGBA, gl.UNSIGNED_BYTE, 1, 1,
+        new Uint8Array([255, 0, 255, 255])),
     };
   }
   return defaultTextures;

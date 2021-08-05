@@ -728,10 +728,6 @@ uniform mat4 modelMatrix;
 uniform mat4 projectionMatrix;
 uniform mat3 normalMatrix;
 
-#ifdef LIGHT_COUNT
-uniform mat4 lightMatrices[LIGHT_COUNT];
-#endif
-
 #pragma UNIFORMS
 
 varying highp vec3 vWorldPos;
@@ -790,6 +786,11 @@ uniform sampler2D uGloss;
 #endif
 #endif
 #endif
+
+#ifdef DIRECTION_TEX
+uniform sampler2D uDirection;
+#endif
+
 uniform sampler2D uBRDF;
 
 uniform vec3 uCameraPosition;
@@ -989,6 +990,25 @@ float CalSpecular(float NdotV, float spec, float gloss) {
   return (spec - C * spec);
 }
 
+vec3 kajiya_kay(vec3 diffuse, vec3 specular, float p, vec3 tangent, vec3 light, vec3 eye) {
+  float cosTL = dot(tangent, light);
+  float cosTE = dot(tangent, eye);
+
+  float cosTL_squared = cosTL * cosTL;
+  float cosTE_squared = cosTE * cosTE;
+
+  float one_minus_cosTL_squared = 1.0 - cosTL_squared;
+  float one_minus_cosTE_squared = 1.0 - cosTE_squared;
+
+  float sinTL = sqrt(one_minus_cosTL_squared);
+  float sinTE = sqrt(one_minus_cosTE_squared);
+
+  vec3 diffuse_colors = diffuse * sinTL;
+  float spec = cosTL * cosTE + sinTL * sinTE;
+  vec3 specular_colors = specular * pow(max(spec, 0.0), p);
+  return diffuse_colors + specular_colors * 0.5;
+}
+
 void main(void)
 {
   vec4 albedoTex = texture2D(uAlbedo, vTexcoord);
@@ -1037,6 +1057,10 @@ void main(void)
   float translucencyTex = texture2D(uTranslucency, vTexcoord).r;
 #endif
 
+#ifdef DIRECTION_TEX
+  vec3 tan = mix(texture2D(uDirection, vTexcoord).rgb * 2.0 - vec3(1.0), N, 0.0);
+#endif
+
   vec3 F0 = vec3(0.04);
   F0 = mix(F0, albedo, metallic);
   vec3 Lo = vec3(0.0);
@@ -1051,6 +1075,16 @@ void main(void)
   ShadowLighting(shadows, shadowblur);
 
   for(int i = 0; i < LIGHT_COUNT; i++) {
+#ifdef DIRECTION_TEX
+    vec3 lightDir = lightDirections[i];
+
+    float NdotL = max(dot(N, lightDir), 0.0);
+
+    vec3 L = kajiya_kay(albedo * lightColors[i], vec3(1.0 - roughness), 30000.0, tan, lightDir, -view);
+
+    L *= NdotL * shadows.val[i];
+    Lo += L;
+#else
     // vec3 lightDir = lightPositions[i] - vWorldPos;
     vec3 lightDir = lightDirections[i];
     vec3 H = normalize(view + lightDir);
@@ -1078,6 +1112,7 @@ void main(void)
 
     L *= NdotL * shadows.val[i];
     Lo += L;
+#endif
   }
 #endif
   vec3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
@@ -1105,7 +1140,11 @@ void main(void)
 
   color = color / (color + vec3(1.0));
   color = pow(color, vec3(0.46226525728));
-  if (albedoTex.a < 0.001) discard;
+#ifdef DIRECTION_TEX
+  if (albedoTex.a < 0.5) discard;
+#else
+  if (albedoTex.a < 0.01) discard;
+#endif
   gl_FragColor = vec4(color, albedoTex.a);
 }`,
   },

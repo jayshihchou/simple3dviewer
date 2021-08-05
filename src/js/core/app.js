@@ -134,6 +134,9 @@ function getTextureNameAndDefine(filelower) {
   } else if (filelower.includes('roughness')) {
     uniforName = 'uRoughness';
     enableKeyword = 'ROUGHNESS_TEX';
+  } else if (filelower.includes('direction')) {
+    uniforName = 'uDirection';
+    enableKeyword = 'DIRECTION_TEX';
   } else if (filelower.includes('nrrt')) {
     uniforName = 'uSpecular';
     enableKeyword = 'MH';
@@ -351,8 +354,10 @@ export default class Application {
     const objs = Object.keys(meshData.meshDict);
     let size = objs.length;
     size = size || 1;
+    const filename = nodeTar.name;
     let name = objs.length === 0 ? undefined : objs[0];
     // console.log(name);
+    if (name !== undefined) nodeTar.name = `${filename}: ${name}`;
     nodeTar.renderable.LoadMesh(meshData, name);
     nodeTar.transform.scale = [scale, scale, scale];
     nodeTar.transform.position = [0.0, 0.0, 0.0];
@@ -362,9 +367,9 @@ export default class Application {
     for (let i = 1; i < size; i += 1) {
       name = objs[i];
       // console.log(name);
-      const node = this.GetNextNode();
+      const node = this.GetNextNode(undefined, false);
       // console.log(node);
-      node.name = `mesh_${name}`;
+      node.name = `${filename}: ${name}`;
       node.renderable.LoadMesh(meshData, name);
       node.transform.scale = [scale, scale, scale];
       node.transform.position = [0.0, 0.0, 0.0];
@@ -447,7 +452,7 @@ export default class Application {
       meshes.forEach((mesh, i) => {
         if (mesh.materialData.length > 0) {
           mesh.materialData.forEach((material, j) => {
-            const node = (i === 0 && j === 0) ? nodeTar : self.GetNextNode();
+            const node = (i === 0 && j === 0) ? nodeTar : self.GetNextNode(undefined, false);
             node.renderable.LoadFBX(mesh, fbxTree, material);
             const t = mesh.transform;
             if (('name' in t) && t.name) node.name = `${t.name} : ${mesh.materials[material.materialIndex]}`;
@@ -456,7 +461,7 @@ export default class Application {
             if ('position' in t) node.transform.position = t.position;
           });
         } else {
-          const node = i === 0 ? nodeTar : self.GetNextNode();
+          const node = i === 0 ? nodeTar : self.GetNextNode(undefined, false);
           node.renderable.LoadFBX(mesh, fbxTree);
           const t = mesh.transform;
           if (('name' in t) && t.name) node.name = t.name;
@@ -465,26 +470,6 @@ export default class Application {
           if ('position' in t) node.transform.position = t.position;
         }
       });
-
-      // if (meshes.length > 0) {
-      //   nodeTar.renderable.LoadFBX(meshes[0], fbxTree);
-      //   const t = meshes[0].transform;
-      //   if (('name' in t) && t.name) nodeTar.name = t.name;
-      //   if ('euler' in t) nodeTar.transform.euler = t.euler;
-      //   if ('scale' in t) nodeTar.transform.scale = t.scale;
-      //   if ('position' in t) nodeTar.transform.position = t.position;
-      // }
-      // if (meshes.length > 1) {
-      //   for (let i = 1; i < meshes.length; i += 1) {
-      //     const node = self.GetNextNode();
-      //     node.renderable.LoadFBX(meshes[i], fbxTree);
-      //     const t = meshes[i].transform;
-      //     if (('name' in t) && t.name) node.name = t.name;
-      //     if ('euler' in t) node.transform.euler = t.euler;
-      //     if ('scale' in t) node.transform.scale = t.scale;
-      //     if ('position' in t) node.transform.position = t.position;
-      //   }
-      // }
       self.triggerEvent('OnLoadMesh', [self.nodes]);
     }, token);
   }
@@ -518,11 +503,12 @@ export default class Application {
     return ls[0][0];
   }
 
-  GetNextNode(shader = undefined) {
+  GetNextNode(shader = undefined, genDefaultCube = true) {
     if (this.nodes.length <= this.nodeCount) {
       let shaderName = shader;
       if (!shaderName) shaderName = 'pbr';
-      const next = new GameNode(new Mesh(shaderName, cubeText), `mesh_${this.nodeCount}`, true);
+      const cubeData = genDefaultCube ? cubeText : undefined;
+      const next = new GameNode(new Mesh(shaderName, cubeData), `mesh_${this.nodeCount}`, true);
       this.nodes.push(next);
     }
     if (this.nodeCount < 0) this.nodeCount = 0;
@@ -548,7 +534,7 @@ export default class Application {
         this.firstIsEmpty = false;
         node = this.GetLastNode();
       } else {
-        node = this.GetNextNode(shader);
+        node = this.GetNextNode(shader, false);
       }
     }
     return node;
