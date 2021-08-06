@@ -125,7 +125,7 @@ export default class CameraControl {
       vec3.add(target, target, right);
       this.look_at_target_offset = target;
       this.button1.enabled = true;
-    } else if (this.alt) {
+    } else if (this.alt && e.type === 2) {
       this.distance_to_object -= (deltaX - deltaY) * timer.deltaTime * 0.05;
       this.target_dist = this.distance_to_object;
     } else {
