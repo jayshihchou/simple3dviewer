@@ -1058,7 +1058,8 @@ void main(void)
 #endif
 
 #ifdef DIRECTION_TEX
-  vec3 tan = mix(texture2D(uDirection, vTexcoord).rgb * 2.0 - vec3(1.0), N, 0.0);
+  vec3 dirmap = UnpackNormal(texture2D(uDirection, vTexcoord).rgb);
+  vec3 tan = mix(dirmap, N, 0.0);
 #endif
 
   vec3 F0 = vec3(0.04);
