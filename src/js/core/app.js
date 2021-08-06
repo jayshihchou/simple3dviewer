@@ -312,10 +312,11 @@ export default class Application {
   // eslint-disable-next-line class-methods-use-this
   render() {
     const group = GameNode.getRenderingGroup();
+    const lightingGroup = GameNode.getLightingGroup();
     const uigroup = GameNode.getRenderingGroupUI();
 
     allLights.forEach((light) => {
-      light.render(group);
+      light.render(lightingGroup);
     });
 
     Light.Update();
@@ -414,6 +415,19 @@ export default class Application {
     }, undefined, token);
   }
 
+  rLoadMesh(path, callback, onfailed, findOrCreate = false, shaderName = 'pbr') {
+    const self = this;
+    const contents = resourceManager.get(path);
+    if (contents) {
+      let { node } = self;
+      if (findOrCreate) {
+        node = self.FindOrCreateNode(findOrCreate, shaderName);
+      }
+      self.loadObj(contents, node);
+      if (callback) callback(node);
+    } else if (onfailed) onfailed();
+  }
+
   loadHair(url, token, inputNode) {
     const self = this;
     let nodeTar = inputNode;
@@ -427,11 +441,13 @@ export default class Application {
     }, undefined, token);
   }
 
-  loadBlendShape(url, token) {
+  rLoadFBX(path, callback) {
     const self = this;
-    ReadFile.readBinary(url, (contents) => {
-      self.loadBlendShapeContents(contents);
-    }, undefined, token);
+    const contents = resourceManager.get(path);
+    // console.log(contents);
+
+    self.onLoadFBX(fbxloader.fbxloader.parse(contents), self.FindOrCreateNode());
+    callback();
   }
 
   loadFBX(url, token, inputNode) {
@@ -439,39 +455,44 @@ export default class Application {
     let nodeTar = inputNode;
     if (nodeTar === undefined) nodeTar = self.node;
     fbxloader.fbxloader.load(url, (fbxTree) => {
-      const meshes = [];
-      fbxTree.forEach((value) => {
-        if (value.morphTargets !== undefined) {
-          meshes.push(value);
-        }
-      });
-      // console.log(fbxTree);
-      // console.log(materialNames);
-      // console.log(meshes);
+      self.onLoadFBX(fbxTree, nodeTar);
+    }, token);
+  }
 
-      meshes.forEach((mesh, i) => {
-        if (mesh.materialData.length > 0) {
-          mesh.materialData.forEach((material, j) => {
-            const node = (i === 0 && j === 0) ? nodeTar : self.GetNextNode(undefined, false);
-            node.renderable.LoadFBX(mesh, fbxTree, material);
-            const t = mesh.transform;
-            if (('name' in t) && t.name) node.name = `${t.name} : ${mesh.materials[material.materialIndex]}`;
-            if ('euler' in t) node.transform.euler = t.euler;
-            if ('scale' in t) node.transform.scale = t.scale;
-            if ('position' in t) node.transform.position = t.position;
-          });
-        } else {
-          const node = i === 0 ? nodeTar : self.GetNextNode(undefined, false);
-          node.renderable.LoadFBX(mesh, fbxTree);
+  onLoadFBX(fbxTree, nodeTar) {
+    const self = this;
+    const meshes = [];
+    fbxTree.forEach((value) => {
+      if (value.morphTargets !== undefined) {
+        meshes.push(value);
+      }
+    });
+    // console.log(fbxTree);
+    // console.log(materialNames);
+    // console.log(meshes);
+
+    meshes.forEach((mesh, i) => {
+      if (mesh.materialData.length > 0) {
+        mesh.materialData.forEach((material, j) => {
+          const node = (i === 0 && j === 0) ? nodeTar : self.GetNextNode(undefined, false);
+          node.renderable.LoadFBX(mesh, fbxTree, material);
           const t = mesh.transform;
-          if (('name' in t) && t.name) node.name = t.name;
+          if (('name' in t) && t.name) node.name = `${t.name} : ${mesh.materials[material.materialIndex]}`;
           if ('euler' in t) node.transform.euler = t.euler;
           if ('scale' in t) node.transform.scale = t.scale;
           if ('position' in t) node.transform.position = t.position;
-        }
-      });
-      self.triggerEvent('OnLoadMesh', [self.nodes]);
-    }, token);
+        });
+      } else {
+        const node = i === 0 ? nodeTar : self.GetNextNode(undefined, false);
+        node.renderable.LoadFBX(mesh, fbxTree);
+        const t = mesh.transform;
+        if (('name' in t) && t.name) node.name = t.name;
+        if ('euler' in t) node.transform.euler = t.euler;
+        if ('scale' in t) node.transform.scale = t.scale;
+        if ('position' in t) node.transform.position = t.position;
+      }
+    });
+    self.triggerEvent('OnLoadMesh', [self.nodes]);
   }
 
   loadTexture(url, token = undefined, toNodes = undefined) {
@@ -492,6 +513,25 @@ export default class Application {
         });
       }
     }, token);
+  }
+
+  rLoadTexture(path, toNodes = undefined) {
+    const self = this;
+    const tex = new Texture2D();
+    const filelower = path.toLowerCase();
+    let nodes = toNodes;
+    if (!nodes) nodes = self.nodes;
+    const [uniforName, enableKeyword] = getTextureNameAndDefine(filelower);
+    if (resourceManager.loadZipTexture(path, tex)) {
+      nodes.forEach((n) => {
+        n.renderable.material.setUniformData(uniforName, tex, true);
+      });
+      if (enableKeyword) {
+        nodes.forEach((n) => {
+          n.renderable.material.addOrUpdateDefine(enableKeyword, 1);
+        });
+      }
+    }
   }
 
   PosToNode(...args) {

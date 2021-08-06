@@ -5,8 +5,10 @@ const debugNodes = [];
 const emptyGameNodeIDs = [];
 let nodeID = -1;
 let renderGroup = [];
+let shadowGroup = [];
 let renderGroupUI = [];
 let needToSort = false;
+let needToSortShadow = false;
 let needToSortUI = false;
 
 export default class GameNode {
@@ -50,6 +52,7 @@ export default class GameNode {
   static sortRenderingGroup() {
     needToSort = true;
     needToSortUI = true;
+    needToSortShadow = true;
   }
 
   static getRenderingGroup() {
@@ -76,6 +79,22 @@ export default class GameNode {
       });
     }
     return renderGroup;
+  }
+
+  static getLightingGroup() {
+    if (needToSortShadow) {
+      needToSortShadow = false;
+      shadowGroup = [];
+      gameNodeGroup.forEach((node) => {
+        if (node && node.renderable
+          && !node.renderable.ui
+          && node.renderable.castShadow
+          && node.renderable.material && node.renderable.material.blendType === 0) {
+          shadowGroup.push(node);
+        }
+      });
+    }
+    return shadowGroup;
   }
 
   static getRenderingGroupUI() {

@@ -23,6 +23,7 @@ export default class Renderable {
     this.gameNode = null;
     this.drawingMode = DrawingMode.Normal;
     this.ui = false;
+    this.castShadow = true;
   }
 
   drawErrorType(matrix, viewMat, projMat) {
