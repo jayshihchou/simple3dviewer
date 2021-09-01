@@ -1005,8 +1005,8 @@ vec3 kajiya_kay(vec3 diffuse, vec3 specular, float p, vec3 tangent, vec3 light, 
 
   vec3 diffuse_colors = diffuse * sinTL;
   float spec = cosTL * cosTE + sinTL * sinTE;
-  vec3 specular_colors = specular * pow(max(spec, 0.0), p);
-  return diffuse_colors + specular_colors * 0.5;
+  vec3 specular_colors = specular * clamp(pow(max(spec, 0.0), p), 0.0, 1.0);
+  return diffuse_colors + specular_colors * 0.1;
 }
 
 void main(void)
@@ -1059,7 +1059,7 @@ void main(void)
 
 #ifdef DIRECTION_TEX
   vec3 dirmap = UnpackNormal(texture2D(uDirection, vTexcoord).rgb);
-  vec3 tan = mix(dirmap, N, 0.0);
+  vec3 tan = dirmap;
 #endif
 
   vec3 F0 = vec3(0.04);
@@ -1081,9 +1081,9 @@ void main(void)
 
     float NdotL = max(dot(N, lightDir), 0.0);
 
-    vec3 L = kajiya_kay(albedo * lightColors[i], vec3(1.0 - roughness), 30000.0, tan, lightDir, -view);
+    vec3 L = kajiya_kay(albedo, vec3(1.0 - roughness), 985.0, tan, lightDir, -view);
 
-    L *= NdotL * shadows.val[i];
+    L *= NdotL * shadows.val[i] * lightColors[i];
     Lo += L;
 #else
     // vec3 lightDir = lightPositions[i] - vWorldPos;
