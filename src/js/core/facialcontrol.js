@@ -9,6 +9,8 @@ import { SetControlEnabled } from './blendshapeControl.js';
 import { addOnStart } from './app.js';
 import { input } from '../engine/inputmanager.js';
 
+let facialControlEnabled = false;
+
 export default class FacialControl {
   constructor(app) {
     app.addEvent('OnLoadMesh', this.CheckIsFacial, this);
@@ -56,6 +58,7 @@ export default class FacialControl {
       }
       if (contains) break;
     }
+    facialControlEnabled = contains;
     SetControlEnabled(!contains);
     if (contains) {
       this.init(mesh);
@@ -511,6 +514,7 @@ export default class FacialControl {
   }
 
   OnKeyDown(e) {
+    if (!facialControlEnabled) return;
     if (e.key === 'b') {
       this.setEnable(!this.enabled);
     }

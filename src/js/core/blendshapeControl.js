@@ -151,6 +151,7 @@ export default class BlendShapeControl {
   }
 
   OnKeyDown(e) {
+    if (!controlEnabled) return;
     if (e.key === 'b') {
       this.setEnable(!this.enabled);
     }
