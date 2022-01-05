@@ -9,8 +9,11 @@ import { GameNode } from './gamenode.js';
 const BlendType = Object.freeze(
   {
     NoBlend: 0,
+    noblend: 0,
     Alpha: 1,
+    alpha: 1,
     Add: 2,
+    add: 2,
   },
 );
 
@@ -39,9 +42,13 @@ const blendFunctions = [NoBlend, AlphaBlend, AddBlend];
 const CullingType = Object.freeze(
   {
     Back: 0,
+    back: 0,
     Front: 1,
+    front: 1,
     FrontAndBack: 2,
+    frontandback: 2,
     Off: 3,
+    off: 3,
   },
 );
 
@@ -79,6 +86,7 @@ export default class Material {
     this.blendFunction = blendFunctions[this.blendType];
     this.cullingType = cullingType || CullingType.Back;
     this.cullingFunction = cullingFunctions[this.cullingType];
+    this.onUpdate = undefined;
   }
 
   get getShader() { return this.shader; }
@@ -115,6 +123,7 @@ export default class Material {
     }
     // console.log(shaderSrc.fs);
     this.shader = new Shader(shaderSrc);
+    if (this.onUpdate !== undefined) this.onUpdate(this.shaderName);
   }
 
   updateParameters() {
@@ -159,9 +168,9 @@ export default class Material {
   getParameter(name) {
     // let c;
     // let param;
-    let key;
+    // let key;
     if (name in this.parameters) {
-      return this.parameters[key].data;
+      return this.parameters[name].data;
     }
     // for (c = this.pkeys.length - 1; c >= 0; c -= 1) {
     //   key = this.pkeys[c];
@@ -441,12 +450,18 @@ export default class Material {
 
   setBlendType(blendType) {
     this.blendType = blendType || BlendType.NoBlend;
+    if (typeof this.blendType === 'string') {
+      this.blendType = BlendType[this.blendType.toLowerCase()];
+    }
     this.blendFunction = blendFunctions[this.blendType];
     GameNode.sortRenderingGroup();
   }
 
   setCullingType(cullingType) {
     this.cullingType = cullingType || CullingType.Back;
+    if (typeof this.cullingType === 'string') {
+      this.cullingType = CullingType[this.cullingType.toLowerCase()];
+    }
     this.cullingFunction = cullingFunctions[this.cullingType];
   }
 

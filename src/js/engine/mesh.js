@@ -316,6 +316,7 @@ export default class Mesh extends Renderable {
     this.blendShapeNames = undefined;
     this.blendWeights = undefined;
     this.blendVertexTexture = undefined;
+    this.blendShapeTextureSize = 0;
     this.shaderName = shaderName;
 
     if (fileData !== undefined) this.LoadObj(fileData);
@@ -941,6 +942,7 @@ export default class Mesh extends Renderable {
   }
 
   createBlendShapeMaterial(texSize, doScale) {
+    this.blendShapeTextureSize = texSize;
     const shader = Shader.FindShaderSource(this.shaderName);
     const replaceDefines = `#define BLENDSHAPE_SIZE ${this.blendShapeSize}\n`
       + `#define BLENDSHAPE_TEX_SIZE ${texSize}.0\n`
@@ -987,6 +989,7 @@ export default class Mesh extends Renderable {
       + 'gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(finalPos, 1.0);\n';
     blendshapeCount += 1;
     let shaderName = `${this.shaderName}${blendshapeCount}`;
+    this.blendshapeShaderName = shaderName;
     Shader.ShaderMap()[shaderName] = {
       vs: shader.vs.slice()
         .replace('#pragma DEFINES', replaceDefines)
@@ -999,6 +1002,7 @@ export default class Mesh extends Renderable {
     this.material.setUniformData('verticeSize', this.verticeSize);
     this.material.setUniformData('blendVertexTexture', this.blendVertexTexture);
     this.material.setUniformData('blendWeights', this.blendWeights);
+    this.material.onUpdate = this.onUpdate.bind(this);
     // console.log(this.material);
     // console.log("loaded");
     shaderName = `wireframe${blendshapeCount}`;
@@ -1017,6 +1021,19 @@ export default class Mesh extends Renderable {
     this.wireframeMaterial.setUniformData('blendVertexTexture', this.blendVertexTexture);
     this.wireframeMaterial.setUniformData('blendWeights', this.blendWeights);
     this.wireframeMaterial.setUniformData('color', [0.0, 1.0, 0.0, 1.0]);
+  }
+
+  onUpdate(shaderName) {
+    if (this.blendShapeSize > 0) {
+      if (shaderName !== this.blendshapeShaderName) {
+        this.shaderName = shaderName;
+        this.createBlendShapeMaterial(this.blendShapeTextureSize, true);
+      } else {
+        this.material.setUniformData('verticeSize', this.verticeSize);
+        this.material.setUniformData('blendVertexTexture', this.blendVertexTexture);
+        this.material.setUniformData('blendWeights', this.blendWeights);
+      }
+    }
   }
 }
 
