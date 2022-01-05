@@ -602,6 +602,9 @@ const fbxloader = {};
             var geoInfo = {};
 
             geoInfo.vertexPositions = (geoNode.Vertices !== undefined) ? geoNode.Vertices.a : [];
+            geoInfo.vertexPositions.forEach((v, i, a) => {
+                a[i] = v * 0.01;
+            });
             geoInfo.vertexIndices = (geoNode.PolygonVertexIndex !== undefined) ? geoNode.PolygonVertexIndex.a : [];
 
             if (geoNode.LayerElementColor) {
@@ -1175,6 +1178,9 @@ const fbxloader = {};
 
         genShape: function (shapeNode) {
             var vertices = shapeNode.Vertices.a;
+            vertices.forEach((v, i, a) => {
+                a[i] = v * 0.01;
+            });
             // for (let i = vertices.length - 1; i >= 0; --i) {
             //     vertices[i] = vertices[i] * 1.0;
             // }
