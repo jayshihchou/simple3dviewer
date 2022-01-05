@@ -94,8 +94,12 @@ export default class Text extends Widget {
     }
     if (this.enabled !== this.enabledTag) {
       this.enabledTag = this.enabled;
-      if (!this.enabled) this.style.display = 'none';
-      else this.style.display = 'block';
+      if (!this.enabled) {
+        this.style.display = 'none';
+      } else {
+        this.style.display = 'block';
+        this.OnRectChanged(this.rect, false);
+      }
     }
   }
 }
