@@ -43,6 +43,7 @@ export default class Hierarchy {
       if (this.currentNode !== undefined) {
         this.currentNode.renderable.enabled = !this.currentNode.renderable.enabled;
       }
+      this.inspEnableBtn.setText(`${this.currentNode.renderable.enabled ? 'enabled' : 'disabled'}`);
     };
     this.inspector.addWidget(this.inspEnableBtn);
     this.inspRenderingModelBtn = new Button(new Rect(0, 0, 300, 50));
