@@ -16,7 +16,6 @@
     "eslint-plugin-import": "^2.22.1",
     "webpack-cli": "^4.4.0"
   },
-  "dependencies": {},
   "repository": {
     "type": "git",
     "url": "git+https://gitlab.com/jayshihchou/simple3dviewer.git"
