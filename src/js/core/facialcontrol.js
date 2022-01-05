@@ -87,6 +87,7 @@ export default class FacialControl {
       this.leftButton = new Button(rect);
       this.leftButton.setText('<');
       this.leftButton.setTextColor([1.0, 0.0, 0.0, 1.0]);
+      this.leftButton.rect.currentToRelative();
       this.leftButton.notify.push(this);
 
       rect = new Rect(0, 0, 0, 0);
@@ -104,10 +105,12 @@ export default class FacialControl {
       rect.width = smallSize;
       rect.x -= rect.width + 20;
       this.stateButton.rect.width = rect.x - 20 - this.stateButton.rect.x;
+      this.stateButton.rect.currentToRelative();
       this.rightButton = new Button(rect);
       this.rightButton.setText('>');
       this.rightButton.setTextColor([1.0, 0.0, 0.0, 1.0]);
       this.rightButton.notify.push(this);
+      this.rightButton.rect.currentToRelative();
 
       this.sliders = [];
       this.texts = [];
@@ -118,6 +121,7 @@ export default class FacialControl {
         rect = new Rect(0, 0, 0, 0);
         rect.setRelative(0.89, 0.8 - i * 0.05, 0.1, 0.04);
         rect.height = Math.min(rect.height, smallSize);
+        rect.currentToRelative();
         slider = new Slider(rect);
         slider.onChangeTargets.push(this);
         rect = new Rect(0, 0, 0, 0);
@@ -135,6 +139,8 @@ export default class FacialControl {
       rect.setRelative(0.03, 0.575, 0.2, 0.2);
       rect.width = largeSize;
       rect.height = largeSize;
+      rect.currentToRelative();
+      rect.setRelativeSquare(true, true);
       this.createJoystickItem(rect, 'brow', [
         'browInnerUp_L',
         'browInnerUp_R',
@@ -148,6 +154,8 @@ export default class FacialControl {
       rect.setRelative(0.03, 0.45, 0.2, 0.2);
       rect.width = largeSize;
       rect.height = largeSize;
+      rect.currentToRelative();
+      rect.setRelativeSquare(true, true);
       this.createJoystickItem(rect, 'eyes', [
         'eyeLookOut_R',
         'eyeLookIn_R',
@@ -163,6 +171,8 @@ export default class FacialControl {
       rect.setRelative(0.03, 0.325, 0.2, 0.2);
       rect.width = largeSize;
       rect.height = largeSize;
+      rect.currentToRelative();
+      rect.setRelativeSquare(true, true);
       this.createJoystickItem(rect, 'nose', [
         'noseSneer_L',
         'noseSneer_R',
@@ -171,6 +181,8 @@ export default class FacialControl {
       rect.setRelative(0.03, 0.2, 0.2, 0.2);
       rect.width = largeSize;
       rect.height = largeSize;
+      rect.currentToRelative();
+      rect.setRelativeSquare(true, true);
       this.createJoystickItem(rect, 'mouth', [
         'mouthRight',
         'mouthLeft',
@@ -184,6 +196,7 @@ export default class FacialControl {
       rect.y += smallSize;
       rect.width = smallSize;
       rect.height = 0.5 * smallSize;
+      rect.currentToRelative();
       const puckerButton = new Button(rect);
       puckerButton.setText('pucker');
       puckerButton.setTextColor([1.0, 1.0, 0.0, 1.0]);
@@ -201,6 +214,8 @@ export default class FacialControl {
       rect.x += 2 * largeSize + 20;
       rect.width = largeSize;
       rect.height = largeSize;
+      rect.currentToRelative();
+      rect.setRelativeSquare(true, true);
       this.createJoystickItem(rect, 'jaw', [
         'jawForward',
         'jawOpen',
@@ -214,6 +229,7 @@ export default class FacialControl {
       rect.y += smallSize;
       rect.width = smallSize;
       rect.height = 0.5 * smallSize;
+      rect.currentToRelative();
       const closeButton = new Button(rect);
       this.mouthCloseMode = false;
       closeButton.setText('close');
@@ -233,6 +249,8 @@ export default class FacialControl {
       rect.setRelative(0.03, 0.075, 0.2, 0.2);
       rect.width = largeSize;
       rect.height = largeSize;
+      rect.currentToRelative();
+      rect.setRelativeSquare(true, true);
       this.createJoystickItem(rect, 'mouth2', [
         'mouthSmile_L',
         'mouthSmile_R',
@@ -276,6 +294,7 @@ export default class FacialControl {
     rect1.x = rx + largeSize + 10;
     rect1.width = smallSize;
     rect1.height = 0.5 * smallSize;
+    rect1.currentToRelative();
     const button = new Button(rect1);
     button.setText(name);
     button.setTextColor([1.0, 1.0, 0.0, 1.0]);
