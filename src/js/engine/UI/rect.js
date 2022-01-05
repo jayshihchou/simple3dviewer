@@ -6,6 +6,7 @@ export default class Rect {
     this.array = [0, 0, 1, 1];
     this.relative = [];
     this.onChangeTargets = [];
+    this.relativeSquare = undefined;
     this.set(x, y, width, height);
   }
 
@@ -71,6 +72,24 @@ export default class Rect {
     return this;
   }
 
+  currentToRelative() {
+    return this.setRelative(
+      this.array[0] / screenSize[0],
+      this.array[1] / screenSize[1],
+      this.array[2] / screenSize[0],
+      this.array[3] / screenSize[1]
+    );
+  }
+
+  setRelativeSquare(enabled, fixHeight = false) {
+    if (!enabled) {
+      this.relativeSquare = undefined;
+    } else {
+      this.relativeSquare = fixHeight ? true : false;
+    }
+    return this;
+  }
+
   set(x, y, width, height) {
     this.array[0] = (x >= 0 ? x : (screenSize[0] + x));
     this.array[1] = (y >= 0 ? y : (screenSize[1] + y));
@@ -104,13 +123,16 @@ export default class Rect {
       const y = this.array[1] / oldSize[1];
       const width = this.array[2] / oldSize[0];
       const height = this.array[3] / oldSize[1];
-      this.array[0] = x * newSize[0];
-      this.array[1] = y * newSize[1];
-      if (this.relative.length > 2 && this.relative[2]) {
-        this.array[2] = width * newSize[0];
-      }
-      if (this.relative.length > 3 && this.relative[3]) {
-        this.array[3] = height * newSize[1];
+      if (this.relative[0]) this.array[0] = x * newSize[0];
+      if (this.relative[1]) this.array[1] = y * newSize[1];
+      if (this.relative[2]) this.array[2] = width * newSize[0];
+      if (this.relative[3]) this.array[3] = height * newSize[1];
+      if (this.relativeSquare !== undefined) {
+        if (this.relativeSquare) { // fix height
+          this.array[2] = this.array[3];
+        } else {
+          this.array[3] = this.array[2];
+        }
       }
       this.onChanged();
     }
