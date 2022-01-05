@@ -329,7 +329,9 @@ const fbxloader = {};
                         if (geometryMap.has(child.ID)) {
                             geometry = geometryMap.get(child.ID);
                         }
-                        if (materials.has(child.ID)) {
+                    });
+                    relationships.children.forEach(function (child) {
+                        if (geometry && materials.has(child.ID)) {
                             if (!geometry.materials) geometry.materials = [];
                             geometry.materials.push(materials.get(child.ID).name);
                             // console.log(child.ID);
@@ -375,13 +377,14 @@ const fbxloader = {};
         // Parse single node mesh geometry in FBXTree.Objects.Geometry
         parseMeshGeometry: function (relationships, geoNode, deformers, matRelationships) {
             // console.log(relationships);
+            // console.log(matRelationships);
             var morphTargets = [];
-            var matnames;
+            // var matnames;
 
             var modelNodes = relationships.parents.map(function (parent) {
                 return fbxTree.Objects.Model[parent.ID];
-
             });
+            // console.log(modelNodes);
 
             // don't create geometry if it is not associated with any models
             if (modelNodes.length === 0) return;

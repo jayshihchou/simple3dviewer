@@ -618,16 +618,19 @@ export default class Mesh extends Renderable {
     // }
 
     if (cx !== undefined && cy !== undefined && cz !== undefined) {
-      const checker = parseFloat(cx);
-      if (checker < 1.0) {
-        faces.push(checker);
-        faces.push(parseFloat(cy));
-        faces.push(parseFloat(cz));
-      } else {
-        faces.push(checker / 255.0);
-        faces.push(parseFloat(cy) / 255.0);
-        faces.push(parseFloat(cz) / 255.0);
-      }
+      faces.push(parseFloat(cx));
+      faces.push(parseFloat(cy));
+      faces.push(parseFloat(cz));
+      // const checker = parseFloat(cx);
+      // if (checker < 1.0) {
+      //   faces.push(checker);
+      //   faces.push(parseFloat(cy));
+      //   faces.push(parseFloat(cz));
+      // } else {
+      //   faces.push(checker / 255.0);
+      //   faces.push(parseFloat(cy) / 255.0);
+      //   faces.push(parseFloat(cz) / 255.0);
+      // }
     }
 
     this.size += 1;
@@ -770,16 +773,25 @@ export default class Mesh extends Renderable {
       this.meshFaceStart = undefined;
       this.meshFaceCount = mesh.buffers.vertexIndex.length / 3;
     }
+    // console.log(mesh);
 
-    let [faceTangents, faceBitangents] = calcTangents(mesh.buffers.vertex, mesh.buffers.uvs[0], normal, mesh.buffers.vertexIndex, mesh.buffers.meshVertices.length);
+    const containsUV = mesh.buffers.uvs.length > 0 && mesh.buffers.uvs[0].length > 0;
+    let faceTangents = undefined;
+    let faceBitangents = undefined;
+    if (containsUV) {
+      [faceTangents, faceBitangents] = calcTangents(mesh.buffers.vertex, mesh.buffers.uvs[0], normal, mesh.buffers.vertexIndex, mesh.buffers.meshVertices.length);
 
-    faceTangents = toTriangleVec(mesh.buffers.vertexIndex, faceTangents);
-    faceBitangents = toTriangleVec(mesh.buffers.vertexIndex, faceBitangents);
+      faceTangents = toTriangleVec(mesh.buffers.vertexIndex, faceTangents);
+      faceBitangents = toTriangleVec(mesh.buffers.vertexIndex, faceBitangents);
+    } else {
+      faceTangents = faceBitangents = [];
+    }
 
     const containsTangents = faceTangents.length > 0 && faceBitangents.length > 0;
     const containsColors = mesh.buffers.colors.length > 0;
     const containsNormal = normal.length > 0;
-    const containsUV = mesh.buffers.uvs.length > 0 && mesh.buffers.uvs[0].length > 0;
+    let uvs = mesh.buffers.uvs[0];
+    if (!containsUV) uvs = [];
 
     const faces = [];
     let i = material ? material.start : 0;
@@ -789,11 +801,10 @@ export default class Mesh extends Renderable {
         faces,
         mesh.buffers.vertexIndex[i],
         mesh.buffers.vertex[i * 3], mesh.buffers.vertex[i * 3 + 1], mesh.buffers.vertex[i * 3 + 2],
-        mesh.buffers.uvs[0][i * 2], mesh.buffers.uvs[0][i * 2 + 1],
+        uvs[i * 2], uvs[i * 2 + 1],
         normal[i * 3], normal[i * 3 + 1], normal[i * 3 + 2],
         faceTangents[i * 3], faceTangents[i * 3 + 1], faceTangents[i * 3 + 2],
         faceBitangents[i * 3], faceBitangents[i * 3 + 1], faceBitangents[i * 3 + 2],
-        // undefined, undefined, undefined,
         mesh.buffers.colors[i * 3], mesh.buffers.colors[i * 3 + 1], mesh.buffers.colors[i * 3 + 2],
       );
     }
@@ -807,6 +818,21 @@ export default class Mesh extends Renderable {
     if (containsNormal) stride += 3;
     if (containsUV) stride += 2;
     if (containsTangents) stride += 6;
+
+    // // inspecting
+    // console.log(`should be: ${faces.length / this.size}, but: ${stride}`);
+    // console.log(`contains color: ${containsColors}`);
+    // console.log(`contains normal: ${containsNormal}`);
+    // console.log(`contains tangents: ${containsTangents}`);
+    // console.log(`contains uv: ${containsUV}`);
+    // i = imax - 1;
+    // console.log(`faces: ${mesh.buffers.vertexIndex[i]}`);
+    // console.log(`vertex: ${mesh.buffers.vertex[i * 3]}, ${mesh.buffers.vertex[i * 3 + 1]}, ${mesh.buffers.vertex[i * 3 + 2]}`);
+    // console.log(`uvs: ${uvs[i * 2]}, ${uvs[i * 2 + 1]}`);
+    // console.log(`normal: ${normal[i * 3]}, ${normal[i * 3 + 1]}, ${normal[i * 3 + 2]}`);
+    // console.log(`faceTangents: ${faceTangents[i * 3]}, ${faceTangents[i * 3 + 1]}, ${faceTangents[i * 3 + 2]}`);
+    // console.log(`faceBitangents: ${faceBitangents[i * 3]}, ${faceBitangents[i * 3 + 1]}, ${faceBitangents[i * 3 + 2]}`);
+    // console.log(`colors: ${mesh.buffers.colors[i * 3]}, ${mesh.buffers.colors[i * 3 + 1]}, ${mesh.buffers.colors[i * 3 + 2]}`);
 
     let size = 3;
     this.attributeDatas.push({

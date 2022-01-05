@@ -477,7 +477,10 @@ export default class Application {
           const node = (i === 0 && j === 0) ? nodeTar : self.GetNextNode(undefined, false);
           node.renderable.LoadFBX(mesh, fbxTree, material);
           const t = mesh.transform;
-          if (('name' in t) && t.name) node.name = `${t.name} : ${mesh.materials[material.materialIndex]}`;
+          if (mesh.materials === undefined) node.name = `${t.name}`;
+          else {
+            if (('name' in t) && t.name) node.name = `${t.name} : ${mesh.materials[material.materialIndex]}`;
+          }
           if ('euler' in t) node.transform.euler = t.euler;
           if ('scale' in t) node.transform.scale = t.scale;
           if ('position' in t) node.transform.position = t.position;
