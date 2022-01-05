@@ -136,6 +136,13 @@ export default class Joystick {
       this.rect.x + this.rect.width * 0.5 - this.thumb.rect.width * 0.5,
       this.rect.y + this.rect.height * 0.5 - this.thumb.rect.height * 0.5,
     ];
+
+    if (this.type === 0) {
+      // this.x = 2.0 * (this.thumb.rect.x - this.center[0])) / this.widthSize
+      // this.y = (2.0 * (this.thumb.rect.y - this.center[1])) / this.heightSize
+      this.thumb.rect.x = this.x * this.widthSize * 0.5 + this.center[0];
+      this.thumb.rect.y = this.y * this.heightSize * 0.5 + this.center[1];
+    }
   }
 
   onValueChange(x, y) {
