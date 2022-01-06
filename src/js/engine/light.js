@@ -37,7 +37,6 @@ export default class Light {
     this.camera.clearDepth = true;
     this.camera.backgroundColor = [1.0, 1.0, 1.0, 1.0];
     this.camera.enabled = false;
-    this.shadowMaterial = new Material('shadow');
     this.color = [1.0, 1.0, 1.0];
     this.index = allLights.length;
     this.debug = false;
@@ -57,7 +56,7 @@ export default class Light {
     }
     this.camera.enabled = true;
     this.renderTexture.bind();
-    this.camera.render(nodeGroup, false, undefined, this.shadowMaterial);
+    this.camera.renderDepth(nodeGroup);
     this.renderTexture.unbind();
     this.camera.enabled = false;
   }

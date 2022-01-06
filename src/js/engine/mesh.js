@@ -745,6 +745,7 @@ export default class Mesh extends Renderable {
     this.blendWeights[index] = value;
     this.material.setUniformData('blendWeights', this.blendWeights);
     this.wireframeMaterial.setUniformData('blendWeights', this.blendWeights);
+    this.shadowMaterial.setUniformData('blendWeights', this.blendWeights);
   }
 
   BlendShapeNameToIndex(name) {
@@ -1021,6 +1022,20 @@ export default class Mesh extends Renderable {
     this.wireframeMaterial.setUniformData('blendVertexTexture', this.blendVertexTexture);
     this.wireframeMaterial.setUniformData('blendWeights', this.blendWeights);
     this.wireframeMaterial.setUniformData('color', [0.0, 1.0, 0.0, 1.0]);
+
+    shaderName = `shadow${blendshapeCount}`;
+    const shadowShader = Shader.FindShaderSource('shadow');
+    Shader.ShaderMap()[shaderName] = {
+      vs: debugShader.vs.slice()
+        .replace('#pragma DEFINES', replaceDefines)
+        .replace('#pragma UNIFORMS', replaceUniforms)
+        .replace(replaceGLPositionSrc, replaceGLPosition),
+      fs: debugShader.fs.slice(),
+    }
+    this.shadowMaterial = new Material(shaderName);
+    this.shadowMaterial.setUniformData('verticeSize', this.verticeSize);
+    this.shadowMaterial.setUniformData('blendVertexTexture', this.blendVertexTexture);
+    this.shadowMaterial.setUniformData('blendWeights', this.blendWeights);
   }
 
   onUpdate(shaderName) {

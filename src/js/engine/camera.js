@@ -105,7 +105,14 @@ export default class Camera {
     this.dirty = true;
   }
 
-  render(nodeGroup, drawDebugDraw = false, Light = undefined, material = undefined) {
+  renderDebugDraw() {
+    const viewMat = this.transform.inverseMatrix;
+    const projMat = this.projectionMatrix;
+    DebugDraw.get()?.draw(viewMat, projMat);
+    return this;
+  }
+
+  render(nodeGroup, Light = undefined, material = undefined) {
     if (!this.enabled) return this;
     if (this.dirty) this.updateProjectionMatrix();
     if (this.viewport[0] !== 0.0 || this.viewport[1] !== 0.0 || this.viewport[2] !== 1.0 || this.viewport[3] !== 1.0) {
@@ -131,14 +138,10 @@ export default class Camera {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
-    // gl.enable(gl.CULL_FACE);
-    // gl.cullFace(gl.BACK);
-    // gl.disable(gl.CULL_FACE);
     nodeGroup.forEach((node) => {
       if (!node.ui) node.render(this, Light, viewMat, projMat, material);
     });
 
-    if (drawDebugDraw) DebugDraw.get()?.draw(viewMat, projMat);
     return this;
   }
 
@@ -169,6 +172,39 @@ export default class Camera {
 
     // gl.disable(gl.BLEND);
     gl.enable(gl.DEPTH_TEST);
+    return this;
+  }
+
+  renderDepth(nodeGroup) {
+    if (!this.enabled) return this;
+    if (this.dirty) this.updateProjectionMatrix();
+    if (this.viewport[0] !== 0.0 || this.viewport[1] !== 0.0 || this.viewport[2] !== 1.0 || this.viewport[3] !== 1.0) {
+      gl.viewport(this.viewport[0], this.viewport[1], this.viewport[2], this.viewport[3]);
+    }
+    const viewMat = this.transform.inverseMatrix;
+    const projMat = this.projectionMatrix;
+
+    if (this.clearColor) gl.clearColor(this.backgroundColor[0], this.backgroundColor[1], this.backgroundColor[2], this.backgroundColor[3]);
+    if (this.clearDepth) gl.clearDepth(1.0);
+
+    if (this.clearColor || this.clearDepth) {
+      if (this.clearColor && this.clearDepth) {
+        // eslint-disable-next-line no-bitwise
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      } else if (!this.clearColor) {
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+      } else if (!this.clearDepth) {
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+    }
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+
+    nodeGroup.forEach((node) => {
+      if (!node.ui) node.renderDepth(this, viewMat, projMat);
+    });
+
     return this;
   }
 }

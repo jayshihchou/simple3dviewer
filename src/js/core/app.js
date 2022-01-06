@@ -324,14 +324,16 @@ export default class Application {
     gl.viewport(0, 0, screenSize[0], screenSize[1]);
     allCameras.forEach((cam, i) => {
       if (!cam.ui) {
-        cam.render(group, i === 0, Light);
+        cam.render(group, Light);
       }
     });
     allCameras.forEach((cam) => {
       if (cam.ui) {
-        cam.render2D(uigroup, false, Light);
+        cam.render2D(uigroup, Light);
       }
     });
+
+    allCameras[0].renderDebugDraw();
 
     const err = gl.getError();
     if (err !== gl.NO_ERROR) {

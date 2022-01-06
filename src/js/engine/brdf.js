@@ -28,7 +28,7 @@ export default class BRDF {
     this.quad.renderable.enabled = true;
     this.camera.enabled = true;
     this.renderTexture.bind();
-    this.camera.render([this.quad], false);
+    this.camera.render([this.quad]);
     this.renderTexture.unbind();
     this.camera.enabled = false;
     this.quad.renderable.enabled = false;

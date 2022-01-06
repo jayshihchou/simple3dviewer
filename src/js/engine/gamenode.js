@@ -135,6 +135,12 @@ export default class GameNode {
     }
   }
 
+  renderDepth(camera, viewMat, projMat) {
+    if (this.renderable) {
+      this.renderable.drawDepth(this.transform.matrix, camera, viewMat, projMat);
+    }
+  }
+
   addComponent(component) {
     if (component) {
       this.components.push(component);

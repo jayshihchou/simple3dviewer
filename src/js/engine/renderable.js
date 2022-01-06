@@ -160,6 +160,14 @@ export default class Renderable {
     return this;
   }
 
+  drawDepth(matrix, camera, viewMat, projMat) {
+    if (this.enabled === false) return this;
+    // console.log(this.shadowMaterial);
+    if (this.shadowMaterial === undefined) this.shadowMaterial = new Material('shadow');
+    if (this.drawingMode !== DrawingMode.WireFrame) this.drawWithMaterial(matrix, camera, undefined, viewMat, projMat, this.shadowMaterial);
+    return this;
+  }
+
   setAttribute(shader, name, sz, st, stri) {
     const size = sz || 3;
     const start = st || 0;
