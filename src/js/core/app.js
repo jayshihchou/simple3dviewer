@@ -452,12 +452,15 @@ export default class Application {
     callback();
   }
 
-  loadFBX(url, token, inputNode) {
+  loadFBX(url, token, findOrCreate = false, shaderName = 'pbr', callback = undefined) {
     const self = this;
-    let nodeTar = inputNode;
-    if (nodeTar === undefined) nodeTar = self.node;
     fbxloader.fbxloader.load(url, (fbxTree) => {
-      self.onLoadFBX(fbxTree, nodeTar);
+      let { node } = self;
+        if (findOrCreate) {
+          node = self.FindOrCreateNode(findOrCreate, shaderName);
+        }
+      self.onLoadFBX(fbxTree, node);
+      callback?.(node);
     }, token);
   }
 
