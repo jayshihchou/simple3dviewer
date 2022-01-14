@@ -4,6 +4,7 @@ jobs:
   replace_file:
     runs-on: ubuntu-latest
     steps:
+      - run: pwd
       - run: id=${{ github.run_number }}
       - run: sedcmd="s+src/index.js?n=1+src/index.js?${id}+"
       - run: sed -i ${sedcmd} index.html
