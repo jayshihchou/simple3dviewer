@@ -2,7 +2,7 @@ name: replace string in index.html
 on: [push]
 jobs:
   replace_file:
-    runs-on: alpine:latest
+    runs-on: ubuntu-latest
     steps:
       - run: id=${{ github.run_number }}
       - run: sedcmd="s+src/index.js?n=1+src/index.js?${id}+"
