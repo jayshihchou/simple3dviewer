@@ -1,6 +1,0 @@
-name: replace string in index.html
-on: [page_build]
-jobs:
-  replace_file:
-    steps:
-      - run: sed -i s+src/index.js?n=1+src/index.js?${{ github.run_number }}+ index.html
