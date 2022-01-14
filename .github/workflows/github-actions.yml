@@ -1,5 +1,5 @@
 name: replace string in index.html
-on: [push]
+on: [deployment]
 jobs:
   replace_file:
     runs-on: ubuntu-latest
